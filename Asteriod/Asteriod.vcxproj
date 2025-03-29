@@ -59,7 +59,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\Dep\AlphaEngine\Include;Include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Dep\AlphaEngine\Include;Include;$(ProjectDir)Include\Network Files;$(ProjectDir)Src\Game Files;$(ProjectDir)Include\Game Files</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -106,17 +106,22 @@ xcopy "$(SolutionDir)Dep\AlphaEngine\lib\fmod.dll" "$(OutDir)" /s /r /y /q</Comm
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Src\Collision.cpp" />
-    <ClCompile Include="Src\GameStateMgr.cpp" />
-    <ClCompile Include="Src\GameState_Asteroids.cpp" />
-    <ClCompile Include="Src\Main.cpp" />
+    <ClCompile Include="Src\Game Files\Collision.cpp" />
+    <ClCompile Include="Src\Game Files\GameStateMgr.cpp" />
+    <ClCompile Include="Src\Game Files\GameState_Asteroids.cpp" />
+    <ClCompile Include="Src\Game Files\Main.cpp" />
+    <ClCompile Include="Src\Network Files\NetworkManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Include\Collision.h" />
-    <ClInclude Include="Include\GameStateList.h" />
-    <ClInclude Include="Include\GameStateMgr.h" />
-    <ClInclude Include="Include\GameState_Asteroids.h" />
-    <ClInclude Include="Include\Main.h" />
+    <ClInclude Include="Include\Game Files\Collision.h" />
+    <ClInclude Include="Include\Game Files\GameStateList.h" />
+    <ClInclude Include="Include\Game Files\GameStateMgr.h" />
+    <ClInclude Include="Include\Game Files\GameState_Asteroids.h" />
+    <ClInclude Include="Include\Game Files\Main.h" />
+    <ClInclude Include="Include\Network Files\GamePacket.h" />
+    <ClInclude Include="Include\Network Files\InputState.h" />
+    <ClInclude Include="Include\Network Files\NetworkManager.h" />
+    <ClInclude Include="Include\Network Files\Player.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

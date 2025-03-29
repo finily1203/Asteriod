@@ -15,33 +15,48 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Src\Collision.cpp">
+    <ClCompile Include="Src\Game Files\Collision.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\GameState_Asteroids.cpp">
+    <ClCompile Include="Src\Game Files\GameState_Asteroids.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\GameStateMgr.cpp">
+    <ClCompile Include="Src\Game Files\GameStateMgr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Main.cpp">
+    <ClCompile Include="Src\Game Files\Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Network Files\NetworkManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Include\Collision.h">
+    <ClInclude Include="Include\Game Files\Collision.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\GameState_Asteroids.h">
+    <ClInclude Include="Include\Game Files\GameState_Asteroids.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\GameStateList.h">
+    <ClInclude Include="Include\Game Files\GameStateList.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\GameStateMgr.h">
+    <ClInclude Include="Include\Game Files\GameStateMgr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\Main.h">
+    <ClInclude Include="Include\Game Files\Main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Network Files\NetworkManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Network Files\Player.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Network Files\GamePacket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Network Files\InputState.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
