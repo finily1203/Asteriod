@@ -1,102 +1,88 @@
-/******************************************************************************/
-/*!
-\file		Main.cpp
-\author 	
-\par    	
-\date   	
-\brief		Main source file of the asteroid shooting game
-
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
- */
-/******************************************************************************/
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <Windows.h>
+#include <iostream>
+#include <memory>
+#include <thread>
 
 #include "main.h"
-#include <memory>
+#include "NetworkManager.h"
+
+#pragma comment(lib, "Ws2_32.lib")
 
 // ---------------------------------------------------------------------------
 // Globals
-float	 g_dt;
-double	 g_appTime;
+float g_dt;
+double g_appTime;
 
+int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_line, int show) {
+    UNREFERENCED_PARAMETER(prevInstanceH);
+    UNREFERENCED_PARAMETER(command_line);
 
-/******************************************************************************/
-/*!
-	Starting point of the application
-*/
-/******************************************************************************/
-int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_line, int show)
-{
-	UNREFERENCED_PARAMETER(prevInstanceH);
-	UNREFERENCED_PARAMETER(command_line);
+    // Initialize the system
+    AESysInit(instanceH, show, 800, 600, 1, 60, false, NULL);
 
-	//// Enable run-time memory check for debug builds.
-	//#if defined(DEBUG) | defined(_DEBUG)
-	//	_CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
-	//#endif
+    // Changing the window title
+    AESysSetWindowTitle("Asteroids with Multiplayer!");
 
-	//int * pi = new int;
-	////delete pi;
+    // Set background color
+    AEGfxSetBackgroundColor(0.0f, 0.0f, 0.0f);
 
+    // Initialize game state manager
+    GameStateMgrInit(GS_ASTEROIDS);
 
-	// Initialize the system
-	AESysInit (instanceH, show, 800, 600, 1, 60, false, NULL);
+    // Initialize network manager
+    NetworkManager networkManager;
+    if (networkManager.Initialize(true)) {
+        // Run the network manager in a separate thread or integrate it into the game loop
+        // std::thread networkThread(&NetworkManager::Run, &networkManager);
+        // networkThread.detach();
+    }
 
-	// Changing the window title
-	AESysSetWindowTitle("Asteroids Demo!");
+    while (gGameStateCurr != GS_QUIT) {
+        // Reset the system modules
+        AESysReset();
 
-	//set background color
-	AEGfxSetBackgroundColor(0.0f, 0.0f, 0.0f);
+        // If not restarting, load the game state
+        if (gGameStateCurr != GS_RESTART) {
+            GameStateMgrUpdate();
+            GameStateLoad();
+        }
+        else {
+            gGameStateNext = gGameStateCurr = gGameStatePrev;
+        }
 
+        // Initialize the game state
+        GameStateInit();
 
+        while (gGameStateCurr == gGameStateNext) {
+            AESysFrameStart();
 
-	GameStateMgrInit(GS_ASTEROIDS);
+            GameStateUpdate();
+            GameStateDraw();
 
-	while(gGameStateCurr != GS_QUIT)
-	{
-		// reset the system modules
-		AESysReset();
+            AESysFrameEnd();
 
-		// If not restarting, load the gamestate
-		if(gGameStateCurr != GS_RESTART)
-		{
-			GameStateMgrUpdate();
-			GameStateLoad();
-		}
-		else
-			gGameStateNext = gGameStateCurr = gGameStatePrev;
+            // Check if forcing the application to quit
+            if ((AESysDoesWindowExist() == false) || AEInputCheckTriggered(AEVK_ESCAPE)) {
+                gGameStateNext = GS_QUIT;
+            }
 
-		// Initialize the gamestate
-		GameStateInit();
+            g_dt = (f32)AEFrameRateControllerGetFrameTime();
+            g_appTime += g_dt;
+        }
 
-		while(gGameStateCurr == gGameStateNext)
-		{
-			AESysFrameStart();
+        GameStateFree();
 
-			GameStateUpdate();
+        if (gGameStateNext != GS_RESTART) {
+            GameStateUnload();
+        }
 
-			GameStateDraw();
-			
-			AESysFrameEnd();
+        gGameStatePrev = gGameStateCurr;
+        gGameStateCurr = gGameStateNext;
+    }
 
-			// check if forcing the application to quit
-			if ((AESysDoesWindowExist() == false) || AEInputCheckTriggered(AEVK_ESCAPE))
-				gGameStateNext = GS_QUIT;
-
-			g_dt = (f32)AEFrameRateControllerGetFrameTime();
-			g_appTime += g_dt;
-		}
-		
-		GameStateFree();
-
-		if(gGameStateNext != GS_RESTART)
-			GameStateUnload();
-
-		gGameStatePrev = gGameStateCurr;
-		gGameStateCurr = gGameStateNext;
-	}
-
-	// free the system
-	AESysExit();
+    // Free the system
+    AESysExit();
 }

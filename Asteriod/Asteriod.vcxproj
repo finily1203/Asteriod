@@ -60,6 +60,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>..\Dep\AlphaEngine\Include;Include;$(ProjectDir)Include\Network Files;$(ProjectDir)Src\Game Files;$(ProjectDir)Include\Game Files</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -111,6 +112,7 @@ xcopy "$(SolutionDir)Dep\AlphaEngine\lib\fmod.dll" "$(OutDir)" /s /r /y /q</Comm
     <ClCompile Include="Src\Game Files\GameState_Asteroids.cpp" />
     <ClCompile Include="Src\Game Files\Main.cpp" />
     <ClCompile Include="Src\Network Files\NetworkManager.cpp" />
+    <ClCompile Include="Src\Network Files\Player.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Game Files\Collision.h" />

@@ -17,7 +17,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define PLAYER_H
 
 #include "AEEngine.h"
-#include "GameState_Asteroids.cpp"
+#include "GameState_Asteroids.h"
+#include <string>
 
 class Player
 {
@@ -28,7 +29,7 @@ public:
 
     // Getters
     unsigned char GetID() const { return m_id; }
-    const char* GetName() const { return m_name; }
+    const std::string& GetName() const { return m_name; }
     int GetScore() const { return m_score; }
     GameObjInst* GetShip() const { return m_ship; }
     bool IsConnected() const { return m_isConnected; }
@@ -46,7 +47,7 @@ public:
 
 private:
     unsigned char m_id;          // Unique player ID (1-4)
-    char m_name[32];             // Player name
+    std::string m_name;          // Player name
     int m_score;                 // Current score
     GameObjInst* m_ship;         // Pointer to player's ship instance
     bool m_isConnected;          // Connection status
