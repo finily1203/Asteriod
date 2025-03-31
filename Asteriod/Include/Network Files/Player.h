@@ -36,10 +36,12 @@ public:
     float GetLastUpdateTime() const { return m_lastUpdateTime; }
 
     // Setters
+    void SetID(unsigned char id) { m_id = id; }
     void SetScore(int score) { m_score = score; }
     void SetShip(GameObjInst* ship) { m_ship = ship; }
     void SetConnected(bool connected) { m_isConnected = connected; }
     void SetLastUpdateTime(float time) { m_lastUpdateTime = time; }
+
 
     // Ship control
     void UpdateShipFromInput(unsigned char inputFlags, float frameTime);

@@ -13,8 +13,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
  */
 /******************************************************************************/
 
-#include "..\Include\Game Files\main.h"
+#define WIN32_LEAN_AND_MEAN
+#include <WinSock2.h>
+#include <ws2tcpip.h>
+#include <Windows.h>
+#include <iostream>
+
+#include "main.h"
 #include "GameState_Asteroids.h"
+#include "Player.h"
+#include "NetworkManager.h"
 
 /******************************************************************************/
 /*!
@@ -211,38 +219,47 @@ void GameStateAsteroidsLoad(void)
 /******************************************************************************/
 void GameStateAsteroidsInit(void)
 {
+	extern NetworkManager networkManager;
 	// create the main ship
 	AEVec2 scale;
 	AEVec2Set(&scale, SHIP_SCALE_X, SHIP_SCALE_Y);
 	spShip = gameObjInstCreate(TYPE_SHIP, &scale, nullptr, nullptr, 0.0f);
 	AE_ASSERT(spShip);
 
+	// Set the first player's ship
+	if (!networkManager.GetPlayers().empty()) {
+		networkManager.GetPlayers()[0].SetShip(spShip);
+		std::cout << "Ship assigned to player 0" << std::endl;
+	}
+	else {
+		std::cerr << "No players available to assign the ship" << std::endl;
+	}
 
-	
+
 	// create the initial 4 asteroids instances using the "gameObjInstCreate" function
 	AEVec2 pos, vel;
 
-	//Asteroid 1
-	pos.x = 90.0f;		pos.y = -220.0f;
-	vel.x = -60.0f;		vel.y = -30.0f;
+	// Asteroid 1
+	pos.x = 90.0f; pos.y = -220.0f;
+	vel.x = -60.0f; vel.y = -30.0f;
 	AEVec2Set(&scale, ASTEROID_MIN_SCALE_X, ASTEROID_MAX_SCALE_Y);
 	gameObjInstCreate(TYPE_ASTEROID, &scale, &pos, &vel, 0.0f);
 
-	//Asteroid 2
-	pos.x = -260.0f;	pos.y = -250.0f;
-	vel.x = 39.0f;		vel.y = -130.0f;
+	// Asteroid 2
+	pos.x = -260.0f; pos.y = -250.0f;
+	vel.x = 39.0f; vel.y = -130.0f;
 	AEVec2Set(&scale, ASTEROID_MAX_SCALE_X, ASTEROID_MIN_SCALE_Y);
 	gameObjInstCreate(TYPE_ASTEROID, &scale, &pos, &vel, 0.0f);
 
-	//Asteroid 3
-	pos.x = -27.0f;	pos.y = -120.0f;
-	vel.x = 45.0f;		vel.y = -57.0f;
+	// Asteroid 3
+	pos.x = -27.0f; pos.y = -120.0f;
+	vel.x = 45.0f; vel.y = -57.0f;
 	AEVec2Set(&scale, ASTEROID_MAX_SCALE_X, ASTEROID_MIN_SCALE_Y);
 	gameObjInstCreate(TYPE_ASTEROID, &scale, &pos, &vel, 0.0f);
 
-	//Asteroid 4
-	pos.x = -69.0f;	pos.y = 240.0f;
-	vel.x = -72.0f;		vel.y = 123.0f;
+	// Asteroid 4
+	pos.x = -69.0f; pos.y = 240.0f;
+	vel.x = -72.0f; vel.y = 123.0f;
 	AEVec2Set(&scale, ASTEROID_MAX_SCALE_X, ASTEROID_MIN_SCALE_Y);
 	gameObjInstCreate(TYPE_ASTEROID, &scale, &pos, &vel, 0.0f);
 
@@ -253,12 +270,10 @@ void GameStateAsteroidsInit(void)
 	spWall = gameObjInstCreate(TYPE_WALL, &scale, &position, nullptr, 0.0f);
 	AE_ASSERT(spWall);
 
-
 	// reset the score and the number of ships
-	sScore      = 0;
-	sShipLives  = SHIP_INITIAL_NUM;
+	sScore = 0;
+	sShipLives = SHIP_INITIAL_NUM;
 }
-
 /******************************************************************************/
 /*!
 	"Update" function of this state
