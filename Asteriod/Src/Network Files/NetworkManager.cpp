@@ -252,10 +252,9 @@ void NetworkManager::UpdateGameState() {
         }
         if (players[i].IsConnected()) {
             gameStatePacket.players[gameStatePacket.playerCount].playerID = players[i].GetID();
-            strncpy_s(gameStatePacket.players[i].name,
-                sizeof(gameStatePacket.players[i].name),
-                players[i].GetName().c_str(),
-                _TRUNCATE);
+            std::string playerName = players[i].GetName();
+            std::copy(playerName.begin(), playerName.end(), gameStatePacket.players[gameStatePacket.playerCount].name);
+            gameStatePacket.players[gameStatePacket.playerCount].name[playerName.size()] = '\0'; // Ensure null-termination
             gameStatePacket.playerCount++;
         }
     }
