@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 
+
 #include "main.h"
 #include "NetworkManager.h"
 
@@ -15,6 +16,7 @@
 // Globals
 float g_dt;
 double g_appTime;
+std::atomic<bool> g_isRunning(true);
 
 NetworkManager networkManager;
 
@@ -56,7 +58,6 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
 
         // Run the network manager in a separate thread
         std::thread networkThread(&NetworkManager::Run, &networkManager);
-        networkThread.detach();
 
         Player player;
         player.SetID(0);
@@ -65,82 +66,86 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
 
         // Add the first player and set as connected
         networkManager.GetPlayers().push_back(player);
+
+        while (gGameStateCurr != GS_QUIT) {
+            // Reset the system modules
+            AESysReset();
+
+            // If not restarting, load the game state
+            if (gGameStateCurr != GS_RESTART) {
+                GameStateMgrUpdate();
+                GameStateLoad();
+            }
+            else {
+                gGameStateNext = gGameStateCurr = gGameStatePrev;
+            }
+
+            // Initialize the game state
+            GameStateInit();
+
+            while (gGameStateCurr == gGameStateNext) {
+                AESysFrameStart();
+
+                GameStateUpdate();
+                GameStateDraw();
+
+                AESysFrameEnd();
+
+                // Check if forcing the application to quit
+                if ((AESysDoesWindowExist() == false) || AEInputCheckTriggered(AEVK_ESCAPE)) {
+                    gGameStateNext = GS_QUIT;
+                }
+
+                g_dt = (f32)AEFrameRateControllerGetFrameTime();
+                g_appTime += g_dt;
+
+                if (isServer) {
+                    // Process server input
+                    unsigned char inputFlags = 0;
+                    if (AEInputCheckCurr(AEVK_UP)) inputFlags |= INPUT_UP;
+                    if (AEInputCheckCurr(AEVK_DOWN)) inputFlags |= INPUT_DOWN;
+                    if (AEInputCheckCurr(AEVK_LEFT)) inputFlags |= INPUT_LEFT;
+                    if (AEInputCheckCurr(AEVK_RIGHT)) inputFlags |= INPUT_RIGHT;
+                    if (AEInputCheckCurr(AEVK_SPACE)) inputFlags |= INPUT_FIRE;
+                    //networkManager.ProcessPlayerInput(networkManager.GetPlayerID(), inputFlags);
+
+                    // Update game state
+                    //networkManager.UpdateGameState();
+                }
+                else {
+                    // Send player input to server
+                    unsigned char inputFlags = 0;
+                    if (AEInputCheckCurr(AEVK_UP)) inputFlags |= INPUT_UP;
+                    if (AEInputCheckCurr(AEVK_DOWN)) inputFlags |= INPUT_DOWN;
+                    if (AEInputCheckCurr(AEVK_LEFT)) inputFlags |= INPUT_LEFT;
+                    if (AEInputCheckCurr(AEVK_RIGHT)) inputFlags |= INPUT_RIGHT;
+                    if (AEInputCheckCurr(AEVK_SPACE)) inputFlags |= INPUT_FIRE;
+                    //networkManager.SendPlayerInput(networkManager.GetPlayerID(), inputFlags);
+
+                    // Receive game state updates from server
+                    //networkManager.ReceiveGameState();
+
+                    // Handle acknowledgments
+                    //.HandleAcknowledgments();
+                }
+            }
+
+            GameStateFree();
+
+            if (gGameStateNext != GS_RESTART) {
+                GameStateUnload();
+            }
+
+            gGameStatePrev = gGameStateCurr;
+            gGameStateCurr = gGameStateNext;
+        }
+
+        // Signal the network thread to stop
+        g_isRunning = false;
+        networkThread.join(); // Wait for the network thread to finish
     }
     else {
         std::cerr << "Failed to initialize network manager." << std::endl;
-    }
-
-    while (gGameStateCurr != GS_QUIT) {
-        // Reset the system modules
-        AESysReset();
-
-        // If not restarting, load the game state
-        if (gGameStateCurr != GS_RESTART) {
-            GameStateMgrUpdate();
-            GameStateLoad();
-        }
-        else {
-            gGameStateNext = gGameStateCurr = gGameStatePrev;
-        }
-
-        // Initialize the game state
-        GameStateInit();
-
-        while (gGameStateCurr == gGameStateNext) {
-            AESysFrameStart();
-
-            GameStateUpdate();
-            GameStateDraw();
-
-            AESysFrameEnd();
-
-            // Check if forcing the application to quit
-            if ((AESysDoesWindowExist() == false) || AEInputCheckTriggered(AEVK_ESCAPE)) {
-                gGameStateNext = GS_QUIT;
-            }
-
-            g_dt = (f32)AEFrameRateControllerGetFrameTime();
-            g_appTime += g_dt;
-
-            if (isServer) {
-                // Process server input
-                unsigned char inputFlags = 0;
-                if (AEInputCheckCurr(AEVK_UP)) inputFlags |= INPUT_UP;
-                if (AEInputCheckCurr(AEVK_DOWN)) inputFlags |= INPUT_DOWN;
-                if (AEInputCheckCurr(AEVK_LEFT)) inputFlags |= INPUT_LEFT;
-                if (AEInputCheckCurr(AEVK_RIGHT)) inputFlags |= INPUT_RIGHT;
-                if (AEInputCheckCurr(AEVK_SPACE)) inputFlags |= INPUT_FIRE;
-                networkManager.ProcessPlayerInput(networkManager.GetPlayerID(), inputFlags);
-
-                // Update game state
-                networkManager.UpdateGameState();
-            }
-            else {
-                // Send player input to server
-                unsigned char inputFlags = 0;
-                if (AEInputCheckCurr(AEVK_UP)) inputFlags |= INPUT_UP;
-                if (AEInputCheckCurr(AEVK_DOWN)) inputFlags |= INPUT_DOWN;
-                if (AEInputCheckCurr(AEVK_LEFT)) inputFlags |= INPUT_LEFT;
-                if (AEInputCheckCurr(AEVK_RIGHT)) inputFlags |= INPUT_RIGHT;
-                if (AEInputCheckCurr(AEVK_SPACE)) inputFlags |= INPUT_FIRE;
-                networkManager.SendPlayerInput(networkManager.GetPlayerID(), inputFlags);
-
-                // Receive game state updates from server
-                networkManager.ReceiveGameState();
-
-                // Handle acknowledgments
-                networkManager.HandleAcknowledgments();
-            }
-        }
-
-        GameStateFree();
-
-        if (gGameStateNext != GS_RESTART) {
-            GameStateUnload();
-        }
-
-        gGameStatePrev = gGameStateCurr;
-        gGameStateCurr = gGameStateNext;
     }
 
     // Free the system

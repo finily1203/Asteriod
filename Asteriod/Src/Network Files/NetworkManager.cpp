@@ -1,9 +1,17 @@
+#define WIN32_LEAN_AND_MEAN
+
+
+#include "main.h"
 #include "NetworkManager.h"
-#include "main.h" // Include the header where g_dt and g_appTime are defined
-#include "GameState_Asteroids.h" // Include the game state header
+#include "GameState_Asteroids.h" +
+#include <WinSock2.h>
+#include <ws2tcpip.h>
 #include <iostream>
-#include <algorithm> // For std::copy
+#include <algorithm>
 #include <unordered_map>
+#include <chrono>
+#include <algorithm>
+#include <cstring>   // For memcpy
 
 /******************************************************************************/
 /*!
@@ -48,112 +56,101 @@ enum TYPE
     TYPE_NUM
 };
 
-NetworkManager::NetworkManager() : udpSocket(INVALID_SOCKET), nextPlayerID(1), playerID(0), isServer(false) {}
-
-NetworkManager::~NetworkManager() {
-    if (udpSocket != INVALID_SOCKET) {
-        closesocket(udpSocket);
-        WSACleanup();
-    }
-}
-
-bool NetworkManager::Initialize(bool isServer) {
-    this->isServer = isServer;
-    if (!InitializeWinsock()) return false;
-    udpSocket = CreateUDPSocket();
-    if (udpSocket == INVALID_SOCKET) return false;
-    if (isServer) {
-        if (!BindSocket(udpSocket, 8888)) return false;
-        this->serverIP = getLocalIP();
-    }
-    else {
-        // Client-specific initialization (e.g., connecting to server)
-        sockaddr_in serverAddr;
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(8888);
-        inet_pton(AF_INET, serverIP.c_str(), &serverAddr.sin_addr);
-        serverAddress = serverAddr;
-    }
-    return true;
-}
-
-bool NetworkManager::InitializeWinsock() {
-    WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cerr << "WSAStartup failed: " << result << std::endl;
-        return false;
-    }
-    return true;
-}
-
-SOCKET NetworkManager::CreateUDPSocket() {
-    SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (udpSocket == INVALID_SOCKET) {
-        WSACleanup();
-        std::cerr << "Failed to create socket: " << WSAGetLastError() << std::endl;
-        return INVALID_SOCKET;
-    }
-    return udpSocket;
-}
-
-bool NetworkManager::BindSocket(SOCKET udpSocket, int port) {
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-
-    int result = bind(udpSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr));
-    if (result == SOCKET_ERROR) {
-        std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
-        closesocket(udpSocket);
-        WSACleanup();
-        return false;
-    }
-    return true;
-}
-
-std::string NetworkManager::getLocalIP() {
+std::string GetLocalIPAddress() {
     char hostname[256];
     if (gethostname(hostname, sizeof(hostname)) == SOCKET_ERROR) {
-        std::cerr << "Error getting hostname: " << WSAGetLastError() << std::endl;
         return "Unknown";
     }
 
-    addrinfo hints{}, * info = nullptr;
+    struct addrinfo hints, * info, * p;
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if (getaddrinfo(hostname, nullptr, &hints, &info) != 0) {
-        std::cerr << "Error getting address info: " << WSAGetLastError() << std::endl;
+    if (getaddrinfo(hostname, NULL, &hints, &info) != 0) {
         return "Unknown";
     }
 
-    std::string ipAddress = "Unknown";
-    for (addrinfo* p = info; p != nullptr; p = p->ai_next) {
-        sockaddr_in* addr = reinterpret_cast<sockaddr_in*>(p->ai_addr);
+    for (p = info; p != NULL; p = p->ai_next) {
+        struct sockaddr_in* addr = (struct sockaddr_in*)p->ai_addr;
         char ip[INET_ADDRSTRLEN];
-        if (inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip)) != nullptr) {
-            ipAddress = ip;
-            break;
-        }
+        inet_ntop(AF_INET, &(addr->sin_addr), ip, INET_ADDRSTRLEN);
+        freeaddrinfo(info);
+        return std::string(ip);
     }
 
     freeaddrinfo(info);
-    return ipAddress;
+    return "Unknown";
 }
 
-void NetworkManager::SendData(SOCKET udpSocket, const char* data, int dataSize, const sockaddr_in& clientAddr) {
-    sendto(udpSocket, data, dataSize, 0, (sockaddr*)&clientAddr, sizeof(clientAddr));
+
+NetworkManager::NetworkManager() : enetHost(nullptr), enetPeer(nullptr), nextPlayerID(1), playerID(0), isServer(false) {
+    if (enet_initialize() != 0) {
+        std::cerr << "An error occurred while initializing ENet." << std::endl;
+    }
 }
 
-int NetworkManager::ReceiveData(SOCKET udpSocket, char* buffer, int bufferSize, sockaddr_in& clientAddr) {
-    int clientAddrSize = sizeof(clientAddr);
-    return recvfrom(udpSocket, buffer, bufferSize, 0, (sockaddr*)&clientAddr, &clientAddrSize);
+NetworkManager::~NetworkManager() {
+    if (enetHost) {
+        enet_host_destroy(enetHost);
+    }
+    enet_deinitialize();
 }
 
-bool NetworkManager::sendPacketAck(SOCKET udpSocket, const sockaddr_in& clientAddr, uint32_t sessionId, uint32_t offset) {
+bool NetworkManager::Initialize(bool isServer) {
+    this->isServer = isServer;
+    if (isServer) {
+        ENetAddress address;
+        address.host = ENET_HOST_ANY;
+        address.port = 8888;
+        enetHost = enet_host_create(&address, 32, 2, 0, 0);
+        if (enetHost == nullptr) {
+            std::cerr << "An error occurred while trying to create an ENet server host." << std::endl;
+            return false;
+        }
+        // Store the server IP address
+        serverIP = GetLocalIPAddress();
+    }
+    else {
+        enetHost = enet_host_create(nullptr, 1, 2, 0, 0);
+        if (enetHost == nullptr) {
+            std::cerr << "An error occurred while trying to create an ENet client host." << std::endl;
+            return false;
+        }
+        ENetAddress address;
+        enet_address_set_host(&address, serverIP.c_str());
+        address.port = 8888;
+        enetPeer = enet_host_connect(enetHost, &address, 2, 0);
+        if (enetPeer == nullptr) {
+            std::cerr << "No available peers for initiating an ENet connection." << std::endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void NetworkManager::SendData(ENetPeer* peer, const char* data, int dataSize) {
+    ENetPacket* packet = enet_packet_create(data, dataSize, ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
+    enet_host_flush(enetHost);
+}
+
+int NetworkManager::ReceiveData(char* buffer, int bufferSize) {
+    ENetEvent event;
+    while (enet_host_service(enetHost, &event, 0) > 0) {
+        if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+            int dataLength = (bufferSize < static_cast<int>(event.packet->dataLength)) ? bufferSize : static_cast<int>(event.packet->dataLength);
+            memcpy(buffer, event.packet->data, static_cast<size_t>(dataLength));
+            enet_packet_destroy(event.packet);
+            return event.packet->dataLength;
+        }
+    }
+    return 0;
+}
+
+bool NetworkManager::sendPacketAck(ENetPeer* peer, uint32_t sessionId, uint32_t offset) {
     char ackBuffer[9];
     ackBuffer[0] = 0x01; // Acknowledgment flag
     uint32_t netSessionId = htonl(sessionId);
@@ -161,51 +158,45 @@ bool NetworkManager::sendPacketAck(SOCKET udpSocket, const sockaddr_in& clientAd
     memcpy(ackBuffer + 1, &netSessionId, 4);
     memcpy(ackBuffer + 5, &netOffset, 4);
 
-    int sendResult = sendto(udpSocket, ackBuffer, sizeof(ackBuffer), 0, (sockaddr*)&clientAddr, sizeof(clientAddr));
-    return sendResult != SOCKET_ERROR;
+    ENetPacket* packet = enet_packet_create(ackBuffer, sizeof(ackBuffer), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
+    enet_host_flush(enetHost);
+
+    return true;
 }
 
-void NetworkManager::SendPlayerInput(unsigned char playerID, unsigned char inputFlags) {
-    PlayerInputPacket packet;
-    packet.header.packetType = PT_PLAYER_INPUT;
-    packet.header.sequenceNumber = 0; // Set appropriate sequence number
-    packet.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count());
-    packet.playerID = playerID;
-    packet.inputFlags = inputFlags;
+bool NetworkManager::sendPacketAndWaitForAck(ENetPeer* peer, const std::vector<char>& packetData, uint32_t sessionId, uint32_t offset) {
+    while (true) {
+        ENetPacket* packet = enet_packet_create(packetData.data(), packetData.size(), ENET_PACKET_FLAG_RELIABLE);
+        enet_peer_send(peer, 0, packet);
+        enet_host_flush(enetHost);
 
-    SendData(udpSocket, reinterpret_cast<const char*>(&packet), sizeof(packet), serverAddress);
-}
+        ENetEvent event;
+        while (enet_host_service(enetHost, &event, 500) > 0) {
+            if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+                if (event.packet->dataLength == 9 && event.packet->data[0] == 0x01) {
+                    uint32_t ackSessionId, ackOffset;
+                    memcpy(&ackSessionId, event.packet->data + 1, 4);
+                    memcpy(&ackOffset, event.packet->data + 5, 4);
 
-void NetworkManager::ReceiveGameState() {
-    char buffer[512];
-    sockaddr_in clientAddr;
-    int bytesReceived = ReceiveData(udpSocket, buffer, sizeof(buffer), clientAddr);
-    if (bytesReceived > 0) {
-        PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer);
-        if (header->packetType == PT_GAME_STATE) {
-            GameStatePacket* gameState = reinterpret_cast<GameStatePacket*>(buffer);
-            // Update game state based on received data
+                    ackSessionId = ntohl(ackSessionId);
+                    ackOffset = ntohl(ackOffset);
+
+                    if (ackSessionId == sessionId && ackOffset == offset) {
+                        enet_packet_destroy(event.packet);
+                        return true;  // Correct acknowledgment, proceed to next chunk
+                    }
+                }
+                enet_packet_destroy(event.packet);
+            }
         }
+        std::cerr << "Timing out, retrying..." << std::endl;
     }
 }
 
-void NetworkManager::HandleAcknowledgments() {
-    char buffer[512];
-    sockaddr_in clientAddr;
-    int bytesReceived = ReceiveData(udpSocket, buffer, sizeof(buffer), clientAddr);
-    if (bytesReceived > 0) {
-        PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer);
-        if (header->packetType == PT_ACK) {
-            AckPacket* ack = reinterpret_cast<AckPacket*>(buffer);
-            // Handle acknowledgment
-        }
-    }
-}
-
-void NetworkManager::HandleNewConnection(const sockaddr_in& clientAddr) {
-    unsigned char playerID = nextPlayerID++; 
-    Player newPlayer(playerID, "Player"); 
+void NetworkManager::HandleNewConnection(ENetPeer* peer) {
+    unsigned char playerID = nextPlayerID++;
+    Player newPlayer(playerID, "Player");
     newPlayer.SetConnected(true);
     players.push_back(newPlayer);
 
@@ -217,197 +208,37 @@ void NetworkManager::HandleNewConnection(const sockaddr_in& clientAddr) {
     packet.playerID = playerID;
     strcpy_s(packet.name, "Player"); // Set player name
 
-    SendData(udpSocket, reinterpret_cast<const char*>(&packet), sizeof(packet), clientAddr);
-}
-
-void NetworkManager::HandlePlayerJoin(const PlayerJoinPacket& packet) {
-    playerID = packet.playerID;
-    std::cout << "Assigned Player ID: " << static_cast<int>(playerID) << std::endl;
-}
-void NetworkManager::UpdateGameState() {
-    // Update player positions and handle game logic
-    for (Player& player : players) {
-		if (players.empty()) {
-			return;
-		}
-        if (!player.IsConnected()) continue;  // Check connection first
-        if (player.GetShip() != nullptr) continue;  // Check ship exists
-
-        // Safe to update ship now
-        player.GetShip()->posCurr.x += player.GetShip()->velCurr.x * g_dt;
-        player.GetShip()->posCurr.y += player.GetShip()->velCurr.y * g_dt;
-    }
-
-    // Send game state updates to clients
-    GameStatePacket gameStatePacket;
-    gameStatePacket.header.packetType = PT_GAME_STATE;
-    gameStatePacket.header.sequenceNumber = 0;
-    gameStatePacket.header.timestamp = static_cast<float>(g_appTime);
-
-    // Only process connected players
-    gameStatePacket.playerCount = 0;
-    for (size_t i = 0; i < players.size() && i < 4; ++i) {
-        if (players.empty()) {
-            return;
-        }
-        if (players[i].IsConnected()) {
-            gameStatePacket.players[gameStatePacket.playerCount].playerID = players[i].GetID();
-            std::string playerName = players[i].GetName();
-            std::copy(playerName.begin(), playerName.end(), gameStatePacket.players[gameStatePacket.playerCount].name);
-            gameStatePacket.players[gameStatePacket.playerCount].name[playerName.size()] = '\0'; // Ensure null-termination
-            gameStatePacket.playerCount++;
-        }
-    }
-
-    gameStatePacket.objectCount = 0; // Update with actual object count if needed
-
-    for (const Player& player : players) {
-        if (player.IsConnected()) {
-            SendData(udpSocket, reinterpret_cast<const char*>(&gameStatePacket), sizeof(gameStatePacket), serverAddress);
-        }
-    }
-}
-
-void NetworkManager::ProcessPlayerInput(unsigned char playerID, unsigned char inputFlags) {
-    static std::unordered_map<unsigned char, bool> prevFireState;
-    for (Player& player : players) {
-        if (player.GetID() == playerID) {
-            // Use the existing game state logic to update the ship's state
-            if (inputFlags & INPUT_UP) {
-                AEVec2 added;
-                AEVec2Set(&added, cosf(player.GetShip()->dirCurr) * SHIP_ACCEL_FORWARD, sinf(player.GetShip()->dirCurr) * SHIP_ACCEL_FORWARD);
-                AEVec2Scale(&added, &added, g_dt);
-                AEVec2Add(&player.GetShip()->velCurr, &player.GetShip()->velCurr, &added);
-                AEVec2Scale(&player.GetShip()->velCurr, &player.GetShip()->velCurr, SHIP_VELOCITY_CAP);
-            }
-            if (inputFlags & INPUT_DOWN) {
-                AEVec2 added;
-                AEVec2Set(&added, -cosf(player.GetShip()->dirCurr) * SHIP_ACCEL_BACKWARD, -sinf(player.GetShip()->dirCurr) * SHIP_ACCEL_BACKWARD);
-                AEVec2Scale(&added, &added, g_dt);
-                AEVec2Add(&player.GetShip()->velCurr, &player.GetShip()->velCurr, &added);
-                AEVec2Scale(&player.GetShip()->velCurr, &player.GetShip()->velCurr, SHIP_VELOCITY_CAP);
-            }
-            if (inputFlags & INPUT_LEFT) {
-                player.GetShip()->dirCurr += SHIP_ROT_SPEED * g_dt;
-                player.GetShip()->dirCurr = AEWrap(player.GetShip()->dirCurr, -PI, PI);
-            }
-            if (inputFlags & INPUT_RIGHT) {
-                player.GetShip()->dirCurr -= SHIP_ROT_SPEED * g_dt;
-                player.GetShip()->dirCurr = AEWrap(player.GetShip()->dirCurr, -PI, PI);
-            }
-            // Fire input detection
-            bool currentFireState = (inputFlags & INPUT_FIRE) != 0;
-            bool wasFiring = prevFireState[playerID];
-
-            if (currentFireState && !wasFiring) {
-                // Set a flag that GameState can check
-                player.SetFiring(true);
-            }
-            else {
-                player.SetFiring(false);
-            }
-        player.SetLastUpdateTime(static_cast<float>(g_appTime));
-            break;
-        }
-    }
+    ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, enetPacket);
+    enet_host_flush(enetHost);
 }
 
 void NetworkManager::Run() {
-    char buffer[512];
-    sockaddr_in clientAddr;
-    while (true) {
-        int bytesReceived = ReceiveData(udpSocket, buffer, sizeof(buffer), clientAddr);
-        if (bytesReceived > 0) {
-            // Handle received data
-            PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer);
-            if (isServer) {
-                switch (header->packetType) {
-                case PT_PLAYER_INPUT:
-                    ProcessPlayerInput(reinterpret_cast<PlayerInputPacket*>(buffer)->playerID, reinterpret_cast<PlayerInputPacket*>(buffer)->inputFlags);
-                    break;
-                case PT_GAME_STATE:
-                    // Handle game state update
-                    break;
-                case PT_ACK:
-                    // Handle acknowledgment
-                    break;
-                case PT_PLAYER_JOIN:
-                    HandleNewConnection(clientAddr);
-                    break;
-                default:
-                    std::cerr << "Unknown packet type received" << std::endl;
-                    break;
-                }
-            }
-            else {
-                switch (header->packetType) {
-                case PT_PLAYER_INPUT:
-                    // Handle player input
-                    break;
-                case PT_GAME_STATE:
-                    // Handle game state update
-                    break;
-                case PT_ACK:
-                    // Handle acknowledgment
-                    break;
-                case PT_PLAYER_JOIN:
-                    HandlePlayerJoin(*reinterpret_cast<PlayerJoinPacket*>(buffer));
-                    break;
-                default:
-                    std::cerr << "Unknown packet type received" << std::endl;
-                    break;
-                }
+    ENetEvent event;
+    while (g_isRunning) { // Check the global running flag
+        while (enet_host_service(enetHost, &event, 1000) > 0) {
+            switch (event.type) {
+            case ENET_EVENT_TYPE_CONNECT:
+                std::cout << "A new client connected from " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
+                // Handle new client connection if server
+                event.peer->data = reinterpret_cast<void*>(nextPlayerID);
+                nextPlayerID++;
+                break;
+            case ENET_EVENT_TYPE_RECEIVE:
+                std::cout << "A packet of length " << event.packet->dataLength << " was received." << std::endl;
+                // Handle received data
+                enet_packet_destroy(event.packet);
+                break;
+            case ENET_EVENT_TYPE_DISCONNECT:
+                std::cout << "Client disconnected." << std::endl;
+                event.peer->data = nullptr;
+                break;
+            default:
+                break;
             }
         }
-
         if (isServer) {
-            UpdateGameState();
-        }
-    }
-}
-void NetworkManager::AddPlayer(unsigned char id, const char* name) {
-    
-}
-bool NetworkManager::sendPacketAndWaitForAck(SOCKET udpSocket, const std::vector<char>& packet, sockaddr_in& clientAddr, uint32_t sessionId, uint32_t offset) {
-    while (true) {
-        int sendResult = sendto(udpSocket, packet.data(), static_cast<int>(packet.size()), 0, reinterpret_cast<sockaddr*>(&clientAddr), sizeof(clientAddr));
-        if (sendResult == SOCKET_ERROR) {
-            std::cerr << "sendto() error: " << WSAGetLastError() << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            continue;
-        }
 
-        fd_set readSet;
-        FD_ZERO(&readSet);
-        FD_SET(udpSocket, &readSet);
-
-        timeval timeout{};
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 500000;
-        int selectResult = select(0, &readSet, nullptr, nullptr, &timeout);
-        if (selectResult > 0 && FD_ISSET(udpSocket, &readSet)) {
-            char ackBuffer[9];
-            sockaddr_in fromAddr{};
-            int fromAddrLen = sizeof(fromAddr);
-            int recvLen = recvfrom(udpSocket, ackBuffer, 9, 0, reinterpret_cast<sockaddr*>(&fromAddr), &fromAddrLen);
-            if (recvLen == 9) {
-                unsigned char ackFlag = ackBuffer[0];
-                if (ackFlag == 0x01) {
-                    uint32_t ackSessionId, ackOffset;
-                    memcpy(&ackSessionId, ackBuffer + 1, 4);
-                    memcpy(&ackOffset, ackBuffer + 5, 4);
-
-                    ackSessionId = ntohl(ackSessionId);
-                    ackOffset = ntohl(ackOffset);
-
-                    if (ackSessionId == sessionId && ackOffset == offset) {
-                        return true;  // Correct acknowledgment, proceed to next chunk
-                    }
-                }
-            }
-        }
-        else {
-            std::cerr << "Timing out" << std::endl;
         }
     }
 }

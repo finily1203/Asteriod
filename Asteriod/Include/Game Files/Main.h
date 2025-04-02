@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #ifndef CSD1130_MAIN_H_
 #define CSD1130_MAIN_H_
+#include <atomic>
 
 //------------------------------------
 // Globals
@@ -23,6 +24,8 @@ extern float	g_dt;
 extern double	g_appTime;
 
 
+
+extern std::atomic<bool> g_isRunning;
 // ---------------------------------------------------------------------------
 // includes
 
@@ -31,7 +34,6 @@ extern double	g_appTime;
 #include "GameStateMgr.h"
 #include "GameState_Asteroids.h"
 #include "Collision.h"
-
 void spawnRandomAsteroid(void);
 
 #endif
