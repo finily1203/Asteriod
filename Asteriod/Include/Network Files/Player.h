@@ -41,7 +41,8 @@ public:
     void SetShip(GameObjInst* ship) { m_ship = ship; }
     void SetConnected(bool connected) { m_isConnected = connected; }
     void SetLastUpdateTime(float time) { m_lastUpdateTime = time; }
-
+    void SetFiring(bool firing) { m_isFiring = firing; }
+    bool IsFiring() const { return m_isFiring; }
 
     // Ship control
     void UpdateShipFromInput(unsigned char inputFlags, float frameTime);
@@ -54,6 +55,8 @@ private:
     GameObjInst* m_ship;         // Pointer to player's ship instance
     bool m_isConnected;          // Connection status
     float m_lastUpdateTime;      // Last time we received update from this player
+    bool m_isFiring;
+
 };
 
 // Input flags for compact network transmission

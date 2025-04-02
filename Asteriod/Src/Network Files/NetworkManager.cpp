@@ -3,6 +3,7 @@
 #include "GameState_Asteroids.h" // Include the game state header
 #include <iostream>
 #include <algorithm> // For std::copy
+#include <unordered_map>
 
 /******************************************************************************/
 /*!
@@ -223,30 +224,40 @@ void NetworkManager::HandlePlayerJoin(const PlayerJoinPacket& packet) {
     playerID = packet.playerID;
     std::cout << "Assigned Player ID: " << static_cast<int>(playerID) << std::endl;
 }
-
 void NetworkManager::UpdateGameState() {
     // Update player positions and handle game logic
     for (Player& player : players) {
-        if (&player != nullptr && player.IsConnected() && player.GetShip() != nullptr) {
-            player.GetShip()->posCurr.x += player.GetShip()->velCurr.x * g_dt;
-            player.GetShip()->posCurr.y += player.GetShip()->velCurr.y * g_dt;
-            // Handle collisions and other game logic here
-        }
+		if (players.empty()) {
+			return;
+		}
+        if (!player.IsConnected()) continue;  // Check connection first
+        if (player.GetShip() != nullptr) continue;  // Check ship exists
+
+        // Safe to update ship now
+        player.GetShip()->posCurr.x += player.GetShip()->velCurr.x * g_dt;
+        player.GetShip()->posCurr.y += player.GetShip()->velCurr.y * g_dt;
     }
 
     // Send game state updates to clients
     GameStatePacket gameStatePacket;
     gameStatePacket.header.packetType = PT_GAME_STATE;
-    gameStatePacket.header.sequenceNumber = 0; // Set appropriate sequence number
+    gameStatePacket.header.sequenceNumber = 0;
     gameStatePacket.header.timestamp = static_cast<float>(g_appTime);
-    gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
 
-    for (size_t i = 0; i < players.size(); ++i) {
-        gameStatePacket.players[i].playerID = players[i].GetID();
-        std::copy(players[i].GetName().begin(), players[i].GetName().end(), gameStatePacket.players[i].name);
-        gameStatePacket.players[i].name[players[i].GetName().size()] = '\0'; // Null-terminate the string
-        gameStatePacket.players[i].score = players[i].GetScore();
-        gameStatePacket.players[i].isAlive = players[i].IsConnected();
+    // Only process connected players
+    gameStatePacket.playerCount = 0;
+    for (size_t i = 0; i < players.size() && i < 4; ++i) {
+        if (players.empty()) {
+            return;
+        }
+        if (players[i].IsConnected()) {
+            gameStatePacket.players[gameStatePacket.playerCount].playerID = players[i].GetID();
+            strncpy_s(gameStatePacket.players[i].name,
+                sizeof(gameStatePacket.players[i].name),
+                players[i].GetName().c_str(),
+                _TRUNCATE);
+            gameStatePacket.playerCount++;
+        }
     }
 
     gameStatePacket.objectCount = 0; // Update with actual object count if needed
@@ -259,6 +270,7 @@ void NetworkManager::UpdateGameState() {
 }
 
 void NetworkManager::ProcessPlayerInput(unsigned char playerID, unsigned char inputFlags) {
+    static std::unordered_map<unsigned char, bool> prevFireState;
     for (Player& player : players) {
         if (player.GetID() == playerID) {
             // Use the existing game state logic to update the ship's state
@@ -284,18 +296,18 @@ void NetworkManager::ProcessPlayerInput(unsigned char playerID, unsigned char in
                 player.GetShip()->dirCurr -= SHIP_ROT_SPEED * g_dt;
                 player.GetShip()->dirCurr = AEWrap(player.GetShip()->dirCurr, -PI, PI);
             }
-            if (inputFlags & INPUT_FIRE) {
-                // Shoot a bullet
-                AEVec2 bulletDirection;
-                AEVec2Set(&bulletDirection, cosf(player.GetShip()->dirCurr), sinf(player.GetShip()->dirCurr));
-                AEVec2 bulletVelocity;
-                AEVec2Scale(&bulletVelocity, &bulletDirection, BULLET_SPEED);
-                AEVec2 bulletPosition = player.GetShip()->posCurr;
-                AEVec2 bulletScale;
-                AEVec2Set(&bulletScale, BULLET_SCALE_X, BULLET_SCALE_Y);
-                gameObjInstCreate(TYPE_BULLET, &bulletScale, &bulletPosition, &bulletVelocity, player.GetShip()->dirCurr);
+            // Fire input detection
+            bool currentFireState = (inputFlags & INPUT_FIRE) != 0;
+            bool wasFiring = prevFireState[playerID];
+
+            if (currentFireState && !wasFiring) {
+                // Set a flag that GameState can check
+                player.SetFiring(true);
             }
-            player.SetLastUpdateTime(static_cast<float>(g_appTime));
+            else {
+                player.SetFiring(false);
+            }
+        player.SetLastUpdateTime(static_cast<float>(g_appTime));
             break;
         }
     }
