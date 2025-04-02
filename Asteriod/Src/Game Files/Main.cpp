@@ -40,15 +40,21 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
     GameStateMgrInit(GS_ASTEROIDS);
 
     // Initialize network manager
-
     bool isServer = true; // Set to true if this instance is the server
     int port = 8888; // Set the UDP port number
+    std::string serverIP = "192.168.68.58"; // Set the server IP address
+
+    if (!isServer) {
+        networkManager.setServer(serverIP);
+    }
 
     if (networkManager.Initialize(isServer)) {
-        // Display server info
-        DisplayServerInfo(networkManager.GetServerIp(), port);
+        if (isServer) {
+            // Display server info
+            DisplayServerInfo(networkManager.GetServerIp(), port);
+        }
 
-        // Run the network manager in a separate thread or integrate it into the game loop
+        // Run the network manager in a separate thread
         std::thread networkThread(&NetworkManager::Run, &networkManager);
         networkThread.detach();
 
@@ -59,7 +65,6 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
 
         // Add the first player and set as connected
         networkManager.GetPlayers().push_back(player);
-
     }
     else {
         std::cerr << "Failed to initialize network manager." << std::endl;

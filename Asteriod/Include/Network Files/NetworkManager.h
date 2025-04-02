@@ -32,6 +32,7 @@ public:
     unsigned char GetPlayerID() const { return playerID; }
     sockaddr_in GetServerAddress() const { return serverAddress; }
 	std::string GetServerIp() const { return serverIP; }
+	void setServer(std::string ip) { serverIP = ip; }
     std::vector<Player>& GetPlayers() { return players; }
 
 private:
