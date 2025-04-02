@@ -16,7 +16,7 @@
     <ProjectGuid>{af3d8227-f654-4f03-b792-b2c5b33c1f4b}</ProjectGuid>
     <RootNamespace>Asteriod</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Asteriod_Server</ProjectName>
+    <ProjectName>Asteroid_Server</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -62,6 +62,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)ENET\include;..\Dep\AlphaEngine\Include;Include;$(ProjectDir)Include\Network Files;$(ProjectDir)Src\Game Files;$(ProjectDir)Include\Game Files</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

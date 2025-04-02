@@ -13,48 +13,7 @@
 #include <algorithm>
 #include <cstring>   // For memcpy
 
-/******************************************************************************/
-/*!
-    Defines
-*/
-/******************************************************************************/
-const unsigned int	GAME_OBJ_NUM_MAX = 32;			// The total number of different objects (Shapes)
-const unsigned int	GAME_OBJ_INST_NUM_MAX = 2048;			// The total number of different game object instances
 
-
-const unsigned int	SHIP_INITIAL_NUM = 3;			// initial number of ship lives
-const float			SHIP_SCALE_X = 16.0f;		// ship scale x
-const float			SHIP_SCALE_Y = 16.0f;		// ship scale y
-const float			BULLET_SCALE_X = 20.0f;		// bullet scale x
-const float			BULLET_SCALE_Y = 3.0f;			// bullet scale y
-const float			ASTEROID_MIN_SCALE_X = 10.0f;		// asteroid minimum scale x
-const float			ASTEROID_MAX_SCALE_X = 60.0f;		// asteroid maximum scale x
-const float			ASTEROID_MIN_SCALE_Y = 10.0f;		// asteroid minimum scale y
-const float			ASTEROID_MAX_SCALE_Y = 60.0f;		// asteroid maximum scale y
-
-const float			WALL_SCALE_X = 64.0f;		// wall scale x
-const float			WALL_SCALE_Y = 164.0f;		// wall scale y
-
-const float			SHIP_VELOCITY_CAP = 0.99f;		// ship velocity cap
-const float			SHIP_ACCEL_FORWARD = 100.0f;		// ship forward acceleration (in m/s^2)
-const float			SHIP_ACCEL_BACKWARD = 100.0f;		// ship backward acceleration (in m/s^2)
-const float			SHIP_ROT_SPEED = (2.0f * PI);	// ship rotation speed (degree/second)
-
-const float			BULLET_SPEED = 400.0f;		// bullet speed (m/s)
-
-const float         BOUNDING_RECT_SIZE = 1.0f;         // this is the normalized bounding rectangle (width and height) sizes - AABB collision data
-
-// -----------------------------------------------------------------------------
-enum TYPE
-{
-    // list of game object types
-    TYPE_SHIP = 0,
-    TYPE_BULLET,
-    TYPE_ASTEROID,
-    TYPE_WALL,
-
-    TYPE_NUM
-};
 
 std::string GetLocalIPAddress() {
     char hostname[256];
@@ -213,6 +172,36 @@ void NetworkManager::HandleNewConnection(ENetPeer* peer) {
     enet_host_flush(enetHost);
 }
 
+
+void NetworkManager::HandlePlayerActionPacket(const PlayerActionPacket& packet) {
+    // Find the player by ID
+    for (auto& player : players) {
+        if (player.GetID() == packet.playerID) {
+            GameObjInst* ship = player.GetShip();
+            if (ship) {
+                // Update the GameObjInst state based on the received action
+                ship->posCurr = packet.position;
+                ship->velCurr = packet.velocity;
+                ship->dirCurr = packet.direction;
+
+                if (packet.actionFlags & ACTION_SHOOT) {
+                    // Handle shooting action
+                    // Create a new bullet instance
+                    AEVec2 bulletDirection;
+                    AEVec2Set(&bulletDirection, cosf(packet.direction), sinf(packet.direction));
+                    AEVec2 bulletVelocity;
+                    AEVec2Scale(&bulletVelocity, &bulletDirection, 400.0f);
+                    AEVec2 bulletPosition = packet.position;
+                    AEVec2 bulletScale;
+                    AEVec2Set(&bulletScale, 20.0f, 3.0f);
+                    gameObjInstCreate(TYPE_BULLET, &bulletScale, &bulletPosition, &bulletVelocity, packet.direction);
+                }
+            }
+            break;
+        }
+    }
+}
+
 void NetworkManager::Run() {
     ENetEvent event;
     while (g_isRunning) { // Check the global running flag
@@ -221,12 +210,19 @@ void NetworkManager::Run() {
             case ENET_EVENT_TYPE_CONNECT:
                 std::cout << "A new client connected from " << event.peer->address.host << ":" << event.peer->address.port << std::endl;
                 // Handle new client connection if server
-                event.peer->data = reinterpret_cast<void*>(nextPlayerID);
-                nextPlayerID++;
+                if (isServer) {
+                    HandleNewConnection(event.peer);
+                }
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 std::cout << "A packet of length " << event.packet->dataLength << " was received." << std::endl;
                 // Handle received data
+                if (event.packet->dataLength == sizeof(PlayerActionPacket)) {
+                    PlayerActionPacket* packet = reinterpret_cast<PlayerActionPacket*>(event.packet->data);
+                    if (packet->header.packetType == PT_PLAYER_ACTION) {
+                        HandlePlayerActionPacket(*packet);
+                    }
+                }
                 enet_packet_destroy(event.packet);
                 break;
             case ENET_EVENT_TYPE_DISCONNECT:
@@ -236,9 +232,6 @@ void NetworkManager::Run() {
             default:
                 break;
             }
-        }
-        if (isServer) {
-
         }
     }
 }

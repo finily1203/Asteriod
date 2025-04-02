@@ -57,6 +57,8 @@ private:
     float m_lastUpdateTime;      // Last time we received update from this player
     bool m_isFiring;
 
+    
+
 };
 
 // Input flags for compact network transmission

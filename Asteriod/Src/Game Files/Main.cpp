@@ -33,7 +33,7 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
     AESysInit(instanceH, show, 800, 600, 1, 60, false, NULL);
 
     // Changing the window title
-    AESysSetWindowTitle("Asteroids with Multiplayer!");
+    AESysSetWindowTitle("Asteroids with Multiplayer! (Server)");
 
     // Set background color
     AEGfxSetBackgroundColor(0.0f, 0.0f, 0.0f);

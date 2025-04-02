@@ -1,17 +1,3 @@
-/******************************************************************************/
-/*!
-\file       GamePacket.h
-\author     [Your Name]
-\par        [Your Email]
-\date       [Current Date]
-\brief      Network packet definitions for multiplayer asteroids game
-
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
-*/
-/******************************************************************************/
-
 #ifndef GAME_PACKET_H
 #define GAME_PACKET_H
 
@@ -39,7 +25,8 @@ enum PacketType {
     PT_GAME_OVER,            // Server -> Client: Game ended
     PT_PLAYER_JOIN,          // Both directions
     PT_PLAYER_LEAVE,         // Server -> Client
-    PT_ACK                   // Acknowledgment
+    PT_ACK,                  // Acknowledgment
+    PT_PLAYER_ACTION         // Client -> Server: Player action
 };
 
 // Player input packet (Client -> Server)
@@ -47,6 +34,9 @@ struct PlayerInputPacket {
     PacketHeader header;
     unsigned char playerID;
     unsigned char inputFlags;    // Bitmask of InputFlags
+    AEVec2 position;
+    AEVec2 velocity;
+    float direction;
 };
 
 // Game state packet (Server -> Client)

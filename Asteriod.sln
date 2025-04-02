@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Asteriod", "Asteriod\Asteriod.vcxproj", "{AF3D8227-F654-4F03-B792-B2C5B33C1F4B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Asteriod_Server", "Asteriod\Asteriod.vcxproj", "{AF3D8227-F654-4F03-B792-B2C5B33C1F4B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Asteroid_Client", "..\Asteroids_Client\Asteriod\AsteriodClient.vcxproj", "{049FB494-78AE-42BF-93D5-61F16BF96B63}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{AF3D8227-F654-4F03-B792-B2C5B33C1F4B}.Debug|x64.Build.0 = Debug|x64
 		{AF3D8227-F654-4F03-B792-B2C5B33C1F4B}.Release|x64.ActiveCfg = Release|x64
 		{AF3D8227-F654-4F03-B792-B2C5B33C1F4B}.Release|x64.Build.0 = Release|x64
+		{049FB494-78AE-42BF-93D5-61F16BF96B63}.Debug|x64.ActiveCfg = Debug|x64
+		{049FB494-78AE-42BF-93D5-61F16BF96B63}.Debug|x64.Build.0 = Debug|x64
+		{049FB494-78AE-42BF-93D5-61F16BF96B63}.Release|x64.ActiveCfg = Release|x64
+		{049FB494-78AE-42BF-93D5-61F16BF96B63}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

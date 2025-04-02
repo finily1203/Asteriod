@@ -56,16 +56,7 @@ const float			BULLET_SPEED			= 400.0f;		// bullet speed (m/s)
 const float         BOUNDING_RECT_SIZE      = 1.0f;         // this is the normalized bounding rectangle (width and height) sizes - AABB collision data
 
 // -----------------------------------------------------------------------------
-enum TYPE
-{
-	// list of game object types
-	TYPE_SHIP = 0, 
-	TYPE_BULLET,
-	TYPE_ASTEROID,
-	TYPE_WALL,
 
-	TYPE_NUM
-};
 
 // -----------------------------------------------------------------------------
 // object flag definition
