@@ -26,7 +26,9 @@ enum PacketType {
     PT_PLAYER_JOIN,          // Both directions
     PT_PLAYER_LEAVE,         // Server -> Client
     PT_ACK,                  // Acknowledgment
-    PT_PLAYER_ACTION         // Client -> Server: Player action
+    PT_PLAYER_ACTION,        // Client -> Server: Player action
+    PT_REQUEST_PLAYER_DATA,
+    PT_GAME_STATE_UPDATE
 };
 
 // Player input packet (Client -> Server)

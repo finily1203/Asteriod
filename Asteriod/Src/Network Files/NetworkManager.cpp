@@ -316,22 +316,72 @@ void NetworkManager::Run() {
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 std::cout << "A packet of length " << event.packet->dataLength << " was received." << std::endl;
-                // Handle received data
-                if (event.packet->dataLength == sizeof(PlayerInputPacket)) {
-                    PlayerInputPacket* packet = reinterpret_cast<PlayerInputPacket*>(event.packet->data);
-                    if (packet->header.packetType == PT_PLAYER_ACTION) {
-                        HandlePlayerActionPacket(event.peer, *packet);
+
+                // Check if we have at least enough data for the header
+                if (event.packet->dataLength >= sizeof(PacketHeader)) {
+                    PacketHeader* header = reinterpret_cast<PacketHeader*>(event.packet->data);
+
+                    // Handle different packet types based on the header's packet type
+                    switch (header->packetType) {
+                    case PT_PLAYER_ACTION:
+                        if (event.packet->dataLength == sizeof(PlayerInputPacket)) {
+                            PlayerInputPacket* packet = reinterpret_cast<PlayerInputPacket*>(event.packet->data);
+                            HandlePlayerActionPacket(event.peer, *packet);
+                        }
+                        break;
+
+                        // Inside NetworkManager::Run() switch statement for packet types
+                    case PT_ASTEROID_SPAWN:
+                        if (event.packet->dataLength == sizeof(AsteroidSpawnPacket)) {
+                            AsteroidSpawnPacket* packet = reinterpret_cast<AsteroidSpawnPacket*>(event.packet->data);
+                            HandleAsteroidSpawnPacket(*packet);
+                            std::cout << "Received and processed asteroid spawn packet" << std::endl;
+                        }
+                        break;
+
+                    case PT_ASTEROID_DESTROY:
+                        if (event.packet->dataLength == sizeof(AsteroidDestroyPacket)) {
+                            AsteroidDestroyPacket* packet = reinterpret_cast<AsteroidDestroyPacket*>(event.packet->data);
+                            HandleAsteroidDestroyPacket(*packet);
+                        }
+                        break;
+
+                    default:
+                        std::cout << "Received packet with unknown type: " << header->packetType << std::endl;
+                        break;
                     }
                 }
+
                 enet_packet_destroy(event.packet);
                 break;
+
             case ENET_EVENT_TYPE_DISCONNECT:
                 std::cout << "Client disconnected." << std::endl;
                 event.peer->data = nullptr;
                 break;
+
             default:
                 break;
             }
         }
     }
+}
+
+void NetworkManager::HandleAsteroidSpawnPacket(const AsteroidSpawnPacket& packet) {
+    if (isServer) return; // Server doesn't need to handle this
+
+    // Create asteroid using the dedicated function
+    GameObjInst* asteroid = CreateAsteroidFromPacket(packet.position, packet.velocity, packet.scale);
+
+    if (asteroid) {
+        std::cout << "Created asteroid from server data" << std::endl;
+    }
+}
+
+
+void NetworkManager::HandleAsteroidDestroyPacket(const AsteroidDestroyPacket& packet) {
+    if (isServer) return; // Server doesn't need to handle this
+
+    // Call the dedicated function to destroy the asteroid
+    DestroyAsteroidById(packet.asteroidID);
 }

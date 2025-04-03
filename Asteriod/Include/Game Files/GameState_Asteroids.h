@@ -63,6 +63,12 @@ void GameStateAsteroidsUpdate(void);
 void GameStateAsteroidsDraw(void);
 void GameStateAsteroidsFree(void);
 void GameStateAsteroidsUnload(void);
+// Add to GameState_Asteroids.h
+// Add to GameState_Asteroids.h
+GameObjInst* CreateAsteroidFromPacket(const AEVec2& position, const AEVec2& velocity, const AEVec2& scale);
+
+void DestroyAsteroidById(unsigned short asteroidId);
+
 // ---------------------------------------------------------------------------
 
 #endif // CSD1130_GAME_STATE_PLAY_H_

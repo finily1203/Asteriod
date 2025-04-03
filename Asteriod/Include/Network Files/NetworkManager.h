@@ -38,6 +38,10 @@ public:
     void    HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputPacket& packet);
     void    Run();
 
+	bool    IsServer() const { return isServer; }
+	ENetHost* GetHost() const { return enetHost; }
+    void HandleAsteroidSpawnPacket(const AsteroidSpawnPacket& packet);
+    void HandleAsteroidDestroyPacket(const AsteroidDestroyPacket& packet);
 
     // Settors
     void SetPlayerID(unsigned char id) { playerID = id; }

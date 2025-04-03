@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "GameState_Asteroids.h"
 #include "Player.h"
 #include "NetworkManager.h"
+#include <chrono>
 
 /******************************************************************************/
 /*!
@@ -446,17 +447,47 @@ void GameStateAsteroidsUpdate(void)
 					// Check for collision between ship and asteroids (Rectangle - Rectangle)
 					if ((CollisionIntersection_RectRect(oi1->boundingBox, oi1->velCurr, oi2->boundingBox, oi2->velCurr, tFirst)) && (sScore < 5000))
 					{
-						// Handle collision between ship and asteroids
-						// Update game behavior accordingly
-						// Update "Object instances array"
+						// Update lives and state
 						sShipLives--;
-						gameObjInstDestroy(oi1);
-						spShip->posCurr.x = 0.0f;
-						spShip->posCurr.y = 0.0f;
 						onValueChange = true;
 						shipMovState = true;
-						spawnRandomAsteroid();
 
+						// If this is the server, handle networking
+						extern NetworkManager networkManager;
+						if (networkManager.IsServer()) {
+							// Send asteroid destroy packet
+							AsteroidDestroyPacket packet;
+							packet.header.packetType = PT_ASTEROID_DESTROY;
+							packet.header.sequenceNumber = 0;
+							packet.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+								std::chrono::system_clock::now().time_since_epoch()).count());
+							packet.asteroidID = static_cast<unsigned short>(oi1 - sGameObjInstList);
+							packet.destroyedBy = networkManager.GetPlayerID();
+
+							// Send to clients
+							if (networkManager.GetPeer() != nullptr) {
+								ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+								enet_peer_send(networkManager.GetPeer(), 0, enetPacket);
+								enet_host_flush(networkManager.GetHost());
+							}
+
+							// Only server spawns new asteroids
+							gameObjInstDestroy(oi1);
+							//spawnRandomAsteroid();
+
+							std::cout << "Server: Ship hit asteroid, destroyed it and spawned a new one" << std::endl;
+						}
+						else {
+							// Client just destroys the asteroid locally
+							gameObjInstDestroy(oi1);
+							std::cout << "Client: Ship hit asteroid, destroyed it locally" << std::endl;
+						}
+
+						// Reset ship position (both server and client)
+						spShip->posCurr.x = 0.0f;
+						spShip->posCurr.y = 0.0f;
+
+						// Check if out of lives
 						if (sShipLives < 0)
 						{
 							spShip->posCurr.x = 0.0f;
@@ -471,23 +502,44 @@ void GameStateAsteroidsUpdate(void)
 				{
 
 					// Check for collision between bullet and asteroids (Rectangle - Rectangle)
-					if ((CollisionIntersection_RectRect(oi1->boundingBox, oi1->velCurr, oi2->boundingBox, oi2->velCurr, tFirst)) && shipMovState)
-					{
-						// Handle collision between bullet and asteroids
-						// Update game behavior accordingly
-						// Update "Object instances array"
+					// Inside the collision logic for bullet-asteroid collision:
+					if ((CollisionIntersection_RectRect(oi1->boundingBox, oi1->velCurr, oi2->boundingBox, oi2->velCurr, tFirst)) && shipMovState) {
+						// Update score
 						sScore += 100;
 						onValueChange = true;
 						shipMovState = true;
-						gameObjInstDestroy(oi1);
-						gameObjInstDestroy(oi2);
-						oi1->flag &= !FLAG_ACTIVE;
-						oi2->flag &= !FLAG_ACTIVE;
-						spawnRandomAsteroid();
-						spawnRandomAsteroid();
 
-						if (sScore >= 5000)
-						{
+						// If this is the server, send an asteroid destroy packet
+						extern NetworkManager networkManager;
+						if (networkManager.IsServer()) {
+							// First, send asteroid destroy packet to clients
+							AsteroidDestroyPacket packet;
+							packet.header.packetType = PT_ASTEROID_DESTROY;
+							packet.header.sequenceNumber = 0;
+							packet.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+								std::chrono::system_clock::now().time_since_epoch()).count());
+							packet.asteroidID = static_cast<unsigned short>(oi1 - sGameObjInstList);
+							packet.destroyedBy = networkManager.GetPlayerID();
+
+							// Send to clients
+							if (networkManager.GetPeer() != nullptr) {
+								ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+								enet_peer_send(networkManager.GetPeer(), 0, enetPacket);
+								enet_host_flush(networkManager.GetHost());
+							}
+
+							// Server destroys the asteroid and bullet
+							gameObjInstDestroy(oi1);
+							gameObjInstDestroy(oi2);
+
+							// Only the server spawns new asteroids
+							spawnRandomAsteroid();
+							//spawnRandomAsteroid();
+
+							std::cout << "Server: Destroyed asteroid and created 2 new ones" << std::endl;
+						}
+
+						if (sScore >= 5000) {
 							shipMovState = false;
 							sScore = 5000;
 						}
@@ -782,5 +834,55 @@ void spawnRandomAsteroid()
 
 	// Call the function to create the asteroid with the random parameters
 	gameObjInstCreate(TYPE_ASTEROID, &randomScale, &randomPos, &randomVel, randomDir);
+
+	// Create the asteroid instance
+	GameObjInst* asteroid = gameObjInstCreate(TYPE_ASTEROID, &randomScale, &randomPos, &randomVel, randomDir);
+
+	// Add debugging to confirm asteroid creation
+	std::cout << "Server created asteroid at position: " << randomPos.x << ", " << randomPos.y << std::endl;
+
+	// Send the asteroid spawn packet to clients
+	extern NetworkManager networkManager;
+	if (asteroid && networkManager.IsServer()) {
+		AsteroidSpawnPacket packet;
+		packet.header.packetType = PT_ASTEROID_SPAWN;
+		packet.header.sequenceNumber = 0;
+		packet.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()).count());
+		packet.asteroidID = static_cast<unsigned short>(asteroid - sGameObjInstList);
+		packet.position = randomPos;
+		packet.velocity = randomVel;
+		packet.scale = randomScale;
+
+		// Send to clients (using your preferred method)
+		// For example, using the peer from networkManager
+		if (networkManager.GetPeer() != nullptr) {
+			ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+			enet_peer_send(networkManager.GetPeer(), 0, enetPacket);
+			std::cout << "Sending asteroid spawn packet to clients" << std::endl;
+			enet_host_flush(networkManager.GetHost());
+		}
+	}
 }
-  
+
+GameObjInst* CreateAsteroidFromPacket(const AEVec2& position, const AEVec2& velocity, const AEVec2& scale) {
+	// Create non-const copies
+	AEVec2 positionCopy = position;
+	AEVec2 velocityCopy = velocity;
+	AEVec2 scaleCopy = scale;
+
+	float direction = atan2f(velocityCopy.y, velocityCopy.x);
+	return gameObjInstCreate(TYPE_ASTEROID, &scaleCopy, &positionCopy, &velocityCopy, direction);
+}
+
+// Add to GameState_Asteroids.cpp
+void DestroyAsteroidById(unsigned short asteroidId) {
+	if (asteroidId < GAME_OBJ_INST_NUM_MAX) {
+		GameObjInst* asteroid = &sGameObjInstList[asteroidId];
+		if (asteroid && (asteroid->flag & FLAG_ACTIVE) &&
+			asteroid->pObject && asteroid->pObject->type == TYPE_ASTEROID) {
+			gameObjInstDestroy(asteroid);
+			std::cout << "Destroyed asteroid ID: " << asteroidId << std::endl;
+		}
+	}
+}
