@@ -35,7 +35,7 @@ public:
     bool    sendPacketAck(ENetPeer* peer, uint32_t sessionId, uint32_t offset);
     bool    sendPacketAndWaitForAck(ENetPeer* peer, const std::vector<char>& packetData, uint32_t sessionId, uint32_t offset);
     void    HandleNewConnection(ENetPeer* peer);
-    void    HandlePlayerActionPacket(const PlayerActionPacket& packet);
+    void    HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputPacket& packet);
     void    Run();
 
 

@@ -52,3 +52,6 @@ Player::Player(unsigned char id, const char* name)
 Player::~Player() {
     // Destructor implementation (if needed)
 }
+
+ENetPeer* Player::GetPeer() const { return m_peer; } // Implement this method
+void Player::SetPeer(ENetPeer* peer) { m_peer = peer; } // Implement this method

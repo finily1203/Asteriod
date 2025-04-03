@@ -157,45 +157,141 @@ void NetworkManager::HandleNewConnection(ENetPeer* peer) {
     unsigned char playerID = nextPlayerID++;
     Player newPlayer(playerID, "Player");
     newPlayer.SetConnected(true);
+    newPlayer.SetPeer(peer); // Set the peer for the new player
     players.push_back(newPlayer);
 
-    PlayerJoinPacket packet;
-    packet.header.packetType = PT_PLAYER_JOIN;
-    packet.header.sequenceNumber = 0; // Set appropriate sequence number
-    packet.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count());
-    packet.playerID = playerID;
-    strcpy_s(packet.name, "Player"); // Set player name
+    // Create a new player instance in the game state
+    AEVec2 scale;
+    AEVec2Set(&scale, 16.0f, 16.0f);
+    GameObjInst* newPlayerShip = gameObjInstCreate(TYPE_SHIP, &scale, nullptr, nullptr, 0.0f);
+    AE_ASSERT(newPlayerShip);
 
-    ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
-    enet_peer_send(peer, 0, enetPacket);
+    // Assign the ship to the new player
+    newPlayer.SetShip(newPlayerShip);
+
+    // Send a packet to the new player to inform them of their player ID
+    PlayerJoinPacket joinPacket;
+    joinPacket.header.packetType = PT_PLAYER_JOIN;
+    joinPacket.header.sequenceNumber = 0; // Set appropriate sequence number
+    joinPacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
+    joinPacket.playerID = playerID;
+    strcpy_s(joinPacket.name, "Player"); // Set player name
+
+    ENetPacket* enetJoinPacket = enet_packet_create(&joinPacket, sizeof(joinPacket), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, enetJoinPacket);
+    enet_host_flush(enetHost);
+
+    // Send the updated player list to all clients
+    GameStatePacket gameStatePacket;
+    gameStatePacket.header.packetType = PT_GAME_STATE;
+    gameStatePacket.header.sequenceNumber = 0; // Set appropriate sequence number
+    gameStatePacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
+
+    // Populate player data
+    gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
+    for (size_t i = 0; i < players.size(); ++i) {
+        gameStatePacket.players[i].playerID = players[i].GetID();
+        strcpy_s(gameStatePacket.players[i].name, players[i].GetName().c_str());
+        gameStatePacket.players[i].score = 0; // Set appropriate score
+        gameStatePacket.players[i].isAlive = (players[i].GetShip() != nullptr);
+    }
+
+    ENetPacket* enetGameStatePacket = enet_packet_create(&gameStatePacket, sizeof(gameStatePacket), ENET_PACKET_FLAG_RELIABLE);
+    for (auto& p : players) {
+        enet_peer_send(peer, 0, enetGameStatePacket); // Use the GetPeer method
+    }
     enet_host_flush(enetHost);
 }
 
-
-void NetworkManager::HandlePlayerActionPacket(const PlayerActionPacket& packet) {
+void NetworkManager::HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputPacket& packet) {
     // Find the player by ID
     for (auto& player : players) {
         if (player.GetID() == packet.playerID) {
             GameObjInst* ship = player.GetShip();
             if (ship) {
                 // Update the GameObjInst state based on the received action
-                ship->posCurr = packet.position;
-                ship->velCurr = packet.velocity;
-                ship->dirCurr = packet.direction;
+                if (packet.inputFlags & ACTION_MOVE_UP) {
+                    AEVec2 added;
+                    AEVec2Set(&added, cosf(ship->dirCurr) * 100.0f, sinf(ship->dirCurr) * 100.0f);
+                    AEVec2Scale(&added, &added, g_dt);
+                    AEVec2Add(&ship->velCurr, &ship->velCurr, &added);
+                    AEVec2Scale(&ship->velCurr, &ship->velCurr, 0.99f);
+                }
 
-                if (packet.actionFlags & ACTION_SHOOT) {
-                    // Handle shooting action
-                    // Create a new bullet instance
+                if (packet.inputFlags & ACTION_MOVE_DOWN) {
+                    AEVec2 added;
+                    AEVec2Set(&added, -cosf(ship->dirCurr) * 100.0f, -sinf(ship->dirCurr) * 100.0f);
+                    AEVec2Scale(&added, &added, g_dt);
+                    AEVec2Add(&ship->velCurr, &ship->velCurr, &added);
+                    AEVec2Scale(&ship->velCurr, &ship->velCurr, 0.99f);
+                }
+
+                if (packet.inputFlags & ACTION_MOVE_LEFT) {
+                    ship->dirCurr += (2.0f * PI) * g_dt;
+                    ship->dirCurr = AEWrap(ship->dirCurr, -PI, PI);
+                }
+
+                if (packet.inputFlags & ACTION_MOVE_RIGHT) {
+                    ship->dirCurr -= (2.0f * PI) * g_dt;
+                    ship->dirCurr = AEWrap(ship->dirCurr, -PI, PI);
+                }
+
+                if (packet.inputFlags & ACTION_SHOOT) {
                     AEVec2 bulletDirection;
-                    AEVec2Set(&bulletDirection, cosf(packet.direction), sinf(packet.direction));
+                    AEVec2Set(&bulletDirection, cosf(ship->dirCurr), sinf(ship->dirCurr));
                     AEVec2 bulletVelocity;
                     AEVec2Scale(&bulletVelocity, &bulletDirection, 400.0f);
-                    AEVec2 bulletPosition = packet.position;
+                    AEVec2 bulletPosition = ship->posCurr;
                     AEVec2 bulletScale;
                     AEVec2Set(&bulletScale, 20.0f, 3.0f);
-                    gameObjInstCreate(TYPE_BULLET, &bulletScale, &bulletPosition, &bulletVelocity, packet.direction);
+                    gameObjInstCreate(TYPE_BULLET, &bulletScale, &bulletPosition, &bulletVelocity, ship->dirCurr);
                 }
+
+                // Update the ship's position
+                AEVec2 displacement;
+                AEVec2Scale(&displacement, &ship->velCurr, g_dt);
+                AEVec2Add(&ship->posCurr, &ship->posCurr, &displacement);
+
+                // Send back the updated game state to the client
+                GameStatePacket gameStatePacket;
+                gameStatePacket.header.packetType = PT_GAME_STATE;
+                gameStatePacket.header.sequenceNumber = 0; // Set appropriate sequence number
+                gameStatePacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+
+                // Populate the ObjectState for the player's ship
+                GameStatePacket::ObjectState objectState;
+                objectState.objectID = player.GetID();
+                objectState.type = TYPE_SHIP;
+                objectState.position = ship->posCurr;
+                objectState.velocity = ship->velCurr;
+                objectState.rotation = ship->dirCurr;
+                objectState.boundingBox = ship->boundingBox;
+
+                // Add the ObjectState to the GameStatePacket
+                gameStatePacket.objectCount = 1;
+                gameStatePacket.objects[0] = objectState;
+
+                // Populate player data
+                gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
+                for (size_t i = 0; i < players.size(); ++i) {
+                    gameStatePacket.players[i].playerID = players[i].GetID();
+                    strcpy_s(gameStatePacket.players[i].name, players[i].GetName().c_str());
+                    gameStatePacket.players[i].score = 0; // Set appropriate score
+                    gameStatePacket.players[i].isAlive = (players[i].GetShip() != nullptr);
+                }
+
+                ENetPacket* enetPacket = enet_packet_create(&gameStatePacket, sizeof(gameStatePacket), ENET_PACKET_FLAG_RELIABLE);
+                if (peer != nullptr) {
+                    enet_peer_send(peer, 0, enetPacket);
+                }
+                else {
+                    // Handle the error or log it
+                    std::cerr << "peer is NULL" << std::endl;
+                }
+                enet_host_flush(enetHost);
             }
             break;
         }
@@ -217,10 +313,10 @@ void NetworkManager::Run() {
             case ENET_EVENT_TYPE_RECEIVE:
                 std::cout << "A packet of length " << event.packet->dataLength << " was received." << std::endl;
                 // Handle received data
-                if (event.packet->dataLength == sizeof(PlayerActionPacket)) {
-                    PlayerActionPacket* packet = reinterpret_cast<PlayerActionPacket*>(event.packet->data);
+                if (event.packet->dataLength == sizeof(PlayerInputPacket)) {
+                    PlayerInputPacket* packet = reinterpret_cast<PlayerInputPacket*>(event.packet->data);
                     if (packet->header.packetType == PT_PLAYER_ACTION) {
-                        HandlePlayerActionPacket(*packet);
+                        HandlePlayerActionPacket(event.peer, *packet);
                     }
                 }
                 enet_packet_destroy(event.packet);

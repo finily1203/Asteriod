@@ -11,6 +11,7 @@ Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /******************************************************************************/
+#define WIN32_LEAN_AND_MEAN
 
 #pragma once
 #ifndef PLAYER_H
@@ -19,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "AEEngine.h"
 #include "GameState_Asteroids.h"
 #include <string>
+#include <enet\enet.h>
 
 class Player
 {
@@ -34,6 +36,7 @@ public:
     GameObjInst* GetShip() const { return m_ship; }
     bool IsConnected() const { return m_isConnected; }
     float GetLastUpdateTime() const { return m_lastUpdateTime; }
+    ENetPeer* GetPeer() const; // Add this method
 
     // Setters
     void SetID(unsigned char id) { m_id = id; }
@@ -43,6 +46,7 @@ public:
     void SetLastUpdateTime(float time) { m_lastUpdateTime = time; }
     void SetFiring(bool firing) { m_isFiring = firing; }
     bool IsFiring() const { return m_isFiring; }
+    void SetPeer(ENetPeer* peer); // Add this method
 
     // Ship control
     void UpdateShipFromInput(unsigned char inputFlags, float frameTime);
@@ -56,6 +60,7 @@ private:
     bool m_isConnected;          // Connection status
     float m_lastUpdateTime;      // Last time we received update from this player
     bool m_isFiring;
+    ENetPeer* m_peer; 
 
     
 

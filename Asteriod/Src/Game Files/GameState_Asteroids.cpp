@@ -226,6 +226,15 @@ void GameStateAsteroidsInit(void)
 		std::cerr << "No players available to assign the ship" << std::endl;
 	}
 
+	// Initialize other players' ships
+	for (auto& player : networkManager.GetPlayers()) {
+		if (player.GetID() != 0) { // Skip the first player as it's already initialized
+			AEVec2Set(&scale, SHIP_SCALE_X, SHIP_SCALE_Y);
+			GameObjInst* newPlayerShip = gameObjInstCreate(TYPE_SHIP, &scale, nullptr, nullptr, 0.0f);
+			AE_ASSERT(newPlayerShip);
+			player.SetShip(newPlayerShip);
+		}
+	}
 
 	// create the initial 4 asteroids instances using the "gameObjInstCreate" function
 	AEVec2 pos, vel;
