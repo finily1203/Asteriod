@@ -237,6 +237,10 @@ void NetworkManager::HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputP
                     ship->dirCurr -= (2.0f * PI) * g_dt;
                     ship->dirCurr = AEWrap(ship->dirCurr, -PI, PI);
                 }
+                // Update position
+                ship->posCurr = packet.position;
+                ship->velCurr = packet.velocity;
+                ship->dirCurr = packet.direction;
 
                 if (packet.inputFlags & ACTION_SHOOT) {
                     AEVec2 bulletDirection;
