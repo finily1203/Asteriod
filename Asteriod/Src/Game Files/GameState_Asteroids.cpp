@@ -43,9 +43,6 @@ const float			ASTEROID_MAX_SCALE_X	= 60.0f;		// asteroid maximum scale x
 const float			ASTEROID_MIN_SCALE_Y	= 10.0f;		// asteroid minimum scale y
 const float			ASTEROID_MAX_SCALE_Y	= 60.0f;		// asteroid maximum scale y
 
-const float			WALL_SCALE_X			= 64.0f;		// wall scale x
-const float			WALL_SCALE_Y			= 164.0f;		// wall scale y
-
 const float			SHIP_VELOCITY_CAP		= 0.99f;		// ship velocity cap
 const float			SHIP_ACCEL_FORWARD		= 100.0f;		// ship forward acceleration (in m/s^2)
 const float			SHIP_ACCEL_BACKWARD		= 100.0f;		// ship backward acceleration (in m/s^2)
@@ -78,10 +75,7 @@ static GameObjInst			sGameObjInstList[GAME_OBJ_INST_NUM_MAX];	// Each element in
 static unsigned long		sGameObjInstNum;							// The number of used game object instances
 
 // pointer to the ship object
-static GameObjInst *		spShip;										// Pointer to the "Ship" game object instance
-
-// pointer to the wall object
-static GameObjInst *		spWall;										// Pointer to the "Wall" game object instance
+static GameObjInst *		spShip;										// Pointer to the "Ship" game object instance									
 
 // number of ship available (lives 0 = game over)
 static long					sShipLives;									// The number of lives left
@@ -94,8 +88,6 @@ static unsigned long		sScore;										// Current score
 // functions to create/destroy a game object instance
 
 void				gameObjInstDestroy(GameObjInst * pInst);
-
-void				Helper_Wall_Collision();
 
 static bool onValueChange = true;
 static bool shipMovState = true;
@@ -178,29 +170,6 @@ void GameStateAsteroidsLoad(void)
 
 	pObj->pMesh = AEGfxMeshEnd();
 	AE_ASSERT_MESG(pObj->pMesh, "fail to create object!!");
-
-
-
-	// =========================
-	// create the wall shape
-	// =========================
-
-	pObj = sGameObjList + sGameObjNum++;
-	pObj->type = TYPE_WALL;
-
-	AEGfxMeshStart();
-	AEGfxTriAdd(
-		-0.5f, -0.5f, 0x6600FF00, 0.0f, 0.0f,
-		0.5f, 0.5f, 0x6600FF00, 0.0f, 0.0f,
-		-0.5f, 0.5f, 0x6600FF00, 0.0f, 0.0f);
-	AEGfxTriAdd(
-		-0.5f, -0.5f, 0x6600FF00, 0.0f, 0.0f,
-		0.5f, -0.5f, 0x6600FF00, 0.0f, 0.0f,
-		0.5f, 0.5f, 0x6600FF00, 0.0f, 0.0f);
-
-	pObj->pMesh = AEGfxMeshEnd();
-	AE_ASSERT_MESG(pObj->pMesh, "fail to create object!!");
-
 }
 
 /******************************************************************************/
@@ -262,13 +231,6 @@ void GameStateAsteroidsInit(void)
 	vel.x = -72.0f; vel.y = 123.0f;
 	AEVec2Set(&scale, ASTEROID_MAX_SCALE_X, ASTEROID_MIN_SCALE_Y);
 	gameObjInstCreate(TYPE_ASTEROID, &scale, &pos, &vel, 0.0f);
-
-	// create the static wall
-	AEVec2Set(&scale, WALL_SCALE_X, WALL_SCALE_Y);
-	AEVec2 position;
-	AEVec2Set(&position, 300.0f, 150.0f);
-	spWall = gameObjInstCreate(TYPE_WALL, &scale, &position, nullptr, 0.0f);
-	AE_ASSERT(spWall);
 
 	// reset the score and the number of ships
 	sScore = 0;
@@ -428,19 +390,6 @@ void GameStateAsteroidsUpdate(void)
 			instance->boundingBox.max = boundingRect_max;
 		}
 	}
-
-
-
-
-	// ======================================================================
-	// check for dynamic-static collisions (one case only: Ship vs Wall)
-	// [DO NOT UPDATE THIS PARAGRAPH'S CODE]
-	// ======================================================================
-	Helper_Wall_Collision();
-
-
-
-
 
 	// ======================================================================
 	// check for dynamic-dynamic collisions
@@ -787,58 +736,6 @@ void gameObjInstDestroy(GameObjInst * pInst)
 	[DO NOT UPDATE THIS PARAGRAPH'S CODE]
 */
 /******************************************************************************/
-void Helper_Wall_Collision()
-{
-	//calculate the vectors between the previous position of the ship and the boundary of wall
-	AEVec2 vec1;
-	vec1.x = spShip->posPrev.x - spWall->boundingBox.min.x;
-	vec1.y = spShip->posPrev.y - spWall->boundingBox.min.y;
-	AEVec2 vec2;
-	vec2.x = 0.0f;
-	vec2.y = -1.0f;
-	AEVec2 vec3;
-	vec3.x = spShip->posPrev.x - spWall->boundingBox.max.x;
-	vec3.y = spShip->posPrev.y - spWall->boundingBox.max.y;
-	AEVec2 vec4;
-	vec4.x = 1.0f;
-	vec4.y = 0.0f;
-	AEVec2 vec5;
-	vec5.x = spShip->posPrev.x - spWall->boundingBox.max.x;
-	vec5.y = spShip->posPrev.y - spWall->boundingBox.max.y;
-	AEVec2 vec6;
-	vec6.x = 0.0f;
-	vec6.y = 1.0f;
-	AEVec2 vec7;
-	vec7.x = spShip->posPrev.x - spWall->boundingBox.min.x;
-	vec7.y = spShip->posPrev.y - spWall->boundingBox.min.y;
-	AEVec2 vec8;
-	vec8.x = -1.0f;
-	vec8.y = 0.0f;
-	if (
-		(AEVec2DotProduct(&vec1, &vec2) >= 0.0f) && (AEVec2DotProduct(&spShip->velCurr, &vec2) <= 0.0f) ||
-		(AEVec2DotProduct(&vec3, &vec4) >= 0.0f) && (AEVec2DotProduct(&spShip->velCurr, &vec4) <= 0.0f) ||
-		(AEVec2DotProduct(&vec5, &vec6) >= 0.0f) && (AEVec2DotProduct(&spShip->velCurr, &vec6) <= 0.0f) ||
-		(AEVec2DotProduct(&vec7, &vec8) >= 0.0f) && (AEVec2DotProduct(&spShip->velCurr, &vec8) <= 0.0f)
-		)
-	{
-		float firstTimeOfCollision = 0.0f;
-		if (CollisionIntersection_RectRect(spShip->boundingBox,
-			spShip->velCurr,
-			spWall->boundingBox,
-			spWall->velCurr,
-			firstTimeOfCollision))
-		{
-			//re-calculating the new position based on the collision's intersection time
-			spShip->posCurr.x = spShip->velCurr.x * (float)firstTimeOfCollision + spShip->posPrev.x;
-			spShip->posCurr.y = spShip->velCurr.y * (float)firstTimeOfCollision + spShip->posPrev.y;
-
-			//reset ship velocity
-			spShip->velCurr.x = 0.0f;
-			spShip->velCurr.y = 0.0f;
-		}
-	}
-}
-
 void spawnRandomAsteroid()
 {
 	// Randomly determine which side of the screen the asteroid will spawn from
