@@ -1,16 +1,4 @@
-/******************************************************************************/
-/*!
-\file		GameState_Asteroids.h
-\author 	Christopher Lam
-\par    	email: c.lam\@digipen.edu ... ...
-\date   	February 07, 2024
-\brief		The header file for the asteroid game state
 
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
- */
-/******************************************************************************/
 
 #include "Collision.h"
 

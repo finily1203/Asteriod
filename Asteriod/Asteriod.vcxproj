@@ -53,6 +53,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\bin\$(Configuration)-$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\.tmp\$(Configuration)-$(Platform)\</IntDir>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)Dep\AlphaEngine\include</IncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)Dep\AlphaEngine\lib</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -90,6 +92,7 @@ xcopy "$(SolutionDir)Dep\AlphaEngine\lib\fmodL.dll" "$(OutDir)" /s /r /y /q</Com
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)ENET\include;..\Dep\AlphaEngine\Include;Include;$(ProjectDir)Include\Network Files;$(ProjectDir)Src\Game Files;$(ProjectDir)Include\Game Files</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -97,6 +100,7 @@ xcopy "$(SolutionDir)Dep\AlphaEngine\lib\fmodL.dll" "$(OutDir)" /s /r /y /q</Com
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);Alpha_Engine.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\Dep\AlphaEngine\Lib;$(SolutionDir)ENET\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy "$(SolutionDir)Assets\*" "$(OutDir)Assets\" /s /r /y /q

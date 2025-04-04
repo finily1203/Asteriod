@@ -1,16 +1,4 @@
-/******************************************************************************/
-/*!
-\file       Player.h
-\author     [Your Name]
-\par        [Your Email]
-\date       [Current Date]
-\brief      Player class definition for multiplayer asteroids game
 
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
-*/
-/******************************************************************************/
 #define WIN32_LEAN_AND_MEAN
 
 #pragma once
