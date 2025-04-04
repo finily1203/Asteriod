@@ -154,64 +154,85 @@ bool NetworkManager::sendPacketAndWaitForAck(ENetPeer* peer, const std::vector<c
 }
 
 void NetworkManager::HandleNewConnection(ENetPeer* peer) {
+    // Assign a new unique player ID (starting from 1 since 0 is server)
     unsigned char playerID = nextPlayerID++;
+
+    // Create new player with this ID
     Player newPlayer(playerID, "Player");
     newPlayer.SetConnected(true);
-    newPlayer.SetPeer(peer); // Set the peer for the new player
+    newPlayer.SetPeer(peer);
     players.push_back(newPlayer);
 
-    // Create a new player instance in the game state
+    // Create ship for this player at a random position
     AEVec2 scale;
     AEVec2Set(&scale, 16.0f, 16.0f);
-    GameObjInst* newPlayerShip = gameObjInstCreate(TYPE_SHIP, &scale, nullptr, nullptr, 0.0f);
+    AEVec2 position;
+    position.x = static_cast<float>(rand() % 400 - 200); // Random x between -200 and 200
+    position.y = static_cast<float>(rand() % 400 - 200); // Random y between -200 and 200
+    GameObjInst* newPlayerShip = gameObjInstCreate(TYPE_SHIP, &scale, &position, nullptr, 0.0f);
     AE_ASSERT(newPlayerShip);
-
-    // Assign the ship to the new player
     newPlayer.SetShip(newPlayerShip);
 
-    // Send a packet to the new player to inform them of their player ID
+    // Send join packet back to client with their assigned ID
     PlayerJoinPacket joinPacket;
     joinPacket.header.packetType = PT_PLAYER_JOIN;
-    joinPacket.header.sequenceNumber = 0; // Set appropriate sequence number
+    joinPacket.header.sequenceNumber = 0;
     joinPacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count());
     joinPacket.playerID = playerID;
-    strcpy_s(joinPacket.name, "Player"); // Set player name
+    strcpy_s(joinPacket.name, "Player");
 
-    ENetPacket* enetJoinPacket = enet_packet_create(&joinPacket, sizeof(joinPacket), ENET_PACKET_FLAG_RELIABLE);
-    enet_peer_send(peer, 0, enetJoinPacket);
-    enet_host_flush(enetHost);
+    SendData(peer, reinterpret_cast<const char*>(&joinPacket), sizeof(joinPacket));
 
-    // Send the updated player list to all clients
-    GameStatePacket gameStatePacket;
-    gameStatePacket.header.packetType = PT_GAME_STATE;
-    gameStatePacket.header.sequenceNumber = 0; // Set appropriate sequence number
-    gameStatePacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+    // Send the complete player list to the newly connected client
+    SendPlayerList(peer);
+
+    // Send initial game state to all players
+    BroadcastGameState();
+}
+
+void NetworkManager::SendPlayerList(ENetPeer* peer) {
+    PlayerDataPacket playerDataPacket;
+    playerDataPacket.header.packetType = PT_PLAYER_DATA;
+    playerDataPacket.header.sequenceNumber = 0;
+    playerDataPacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count());
 
-    // Populate player data
-    gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
+    // Populate all players' data
+    playerDataPacket.playerCount = static_cast<unsigned char>(players.size());
     for (size_t i = 0; i < players.size(); ++i) {
-        gameStatePacket.players[i].playerID = players[i].GetID();
-        strcpy_s(gameStatePacket.players[i].name, players[i].GetName().c_str());
-        gameStatePacket.players[i].score = 0; // Set appropriate score
-        gameStatePacket.players[i].isAlive = (players[i].GetShip() != nullptr);
+        playerDataPacket.players[i].playerID = players[i].GetID();
+        strcpy_s(playerDataPacket.players[i].name, players[i].GetName().c_str());
+        playerDataPacket.players[i].score = players[i].GetScore();
+        playerDataPacket.players[i].isAlive = (players[i].GetShip() != nullptr);
+        playerDataPacket.players[i].isFiring = players[i].IsFiring(); // Populate isFiring field
     }
 
-    ENetPacket* enetGameStatePacket = enet_packet_create(&gameStatePacket, sizeof(gameStatePacket), ENET_PACKET_FLAG_RELIABLE);
-    for (auto& p : players) {
-        enet_peer_send(peer, 0, enetGameStatePacket); // Use the GetPeer method
-    }
+    // Send to the specified peer
+    ENetPacket* packet = enet_packet_create(&playerDataPacket, sizeof(playerDataPacket), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
     enet_host_flush(enetHost);
 }
 
 void NetworkManager::HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputPacket& packet) {
-    // Find the player by ID
+    // Skip if this is the server's player (ID 0)
+    if (packet.playerID == 0) {
+        std::cerr << "Attempt to control server player denied!" << std::endl;
+        return;
+    }
+
+    // Find the player by ID and verify the peer is authorized
     for (auto& player : players) {
         if (player.GetID() == packet.playerID) {
+            // Verify this peer owns this player
+            if (player.GetPeer() != peer) {
+                std::cerr << "Unauthorized control attempt from peer!" << std::endl;
+                return;
+            }
+
             GameObjInst* ship = player.GetShip();
             if (ship) {
-                // Update the GameObjInst state based on the received action
+                // Update ship based on input
                 if (packet.inputFlags & ACTION_MOVE_UP) {
                     AEVec2 added;
                     AEVec2Set(&added, cosf(ship->dirCurr) * 100.0f, sinf(ship->dirCurr) * 100.0f);
@@ -249,53 +270,55 @@ void NetworkManager::HandlePlayerActionPacket(ENetPeer* peer, const PlayerInputP
                     gameObjInstCreate(TYPE_BULLET, &bulletScale, &bulletPosition, &bulletVelocity, ship->dirCurr);
                 }
 
-                // Update the ship's position
+                // Update position
                 AEVec2 displacement;
                 AEVec2Scale(&displacement, &ship->velCurr, g_dt);
                 AEVec2Add(&ship->posCurr, &ship->posCurr, &displacement);
 
-                // Send back the updated game state to the client
-                GameStatePacket gameStatePacket;
-                gameStatePacket.header.packetType = PT_GAME_STATE;
-                gameStatePacket.header.sequenceNumber = 0; // Set appropriate sequence number
-                gameStatePacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count());
-
-                // Populate the ObjectState for the player's ship
-                GameStatePacket::ObjectState objectState;
-                objectState.objectID = player.GetID();
-                objectState.type = TYPE_SHIP;
-                objectState.position = ship->posCurr;
-                objectState.velocity = ship->velCurr;
-                objectState.rotation = ship->dirCurr;
-                objectState.boundingBox = ship->boundingBox;
-
-                // Add the ObjectState to the GameStatePacket
-                gameStatePacket.objectCount = 1;
-                gameStatePacket.objects[0] = objectState;
-
-                // Populate player data
-                gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
-                for (size_t i = 0; i < players.size(); ++i) {
-                    gameStatePacket.players[i].playerID = players[i].GetID();
-                    strcpy_s(gameStatePacket.players[i].name, players[i].GetName().c_str());
-                    gameStatePacket.players[i].score = 0; // Set appropriate score
-                    gameStatePacket.players[i].isAlive = (players[i].GetShip() != nullptr);
-                }
-
-                ENetPacket* enetPacket = enet_packet_create(&gameStatePacket, sizeof(gameStatePacket), ENET_PACKET_FLAG_RELIABLE);
-                if (peer != nullptr) {
-                    enet_peer_send(peer, 0, enetPacket);
-                }
-                else {
-                    // Handle the error or log it
-                    std::cerr << "peer is NULL" << std::endl;
-                }
-                enet_host_flush(enetHost);
+                // Broadcast updated game state to all clients
+                BroadcastGameState();
             }
             break;
         }
     }
+}
+
+void NetworkManager::BroadcastGameState() {
+    GameStatePacket gameStatePacket;
+    gameStatePacket.header.packetType = PT_GAME_STATE;
+    gameStatePacket.header.sequenceNumber = 0;
+    gameStatePacket.header.timestamp = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
+
+    // Populate all players' data
+    gameStatePacket.playerCount = static_cast<unsigned char>(players.size());
+    for (size_t i = 0; i < players.size(); ++i) {
+        gameStatePacket.players[i].playerID = players[i].GetID();
+        strcpy_s(gameStatePacket.players[i].name, players[i].GetName().c_str());
+        gameStatePacket.players[i].score = players[i].GetScore();
+        gameStatePacket.players[i].isAlive = (players[i].GetShip() != nullptr);
+
+        // Include ship data if available
+        if (players[i].GetShip()) {
+            GameStatePacket::ObjectState& objState = gameStatePacket.objects[i];
+            objState.objectID = players[i].GetID();
+            objState.type = TYPE_SHIP;
+            objState.position = players[i].GetShip()->posCurr;
+            objState.velocity = players[i].GetShip()->velCurr;
+            objState.rotation = players[i].GetShip()->dirCurr;
+            objState.boundingBox = players[i].GetShip()->boundingBox;
+        }
+    }
+    gameStatePacket.objectCount = static_cast<unsigned char>(players.size());
+
+    // Send to all connected peers
+    ENetPacket* packet = enet_packet_create(&gameStatePacket, sizeof(gameStatePacket), ENET_PACKET_FLAG_RELIABLE);
+    for (auto& player : players) {
+        if (player.GetPeer()) {
+            enet_peer_send(player.GetPeer(), 0, packet);
+        }
+    }
+    enet_host_flush(enetHost);
 }
 
 void NetworkManager::Run() {
@@ -318,6 +341,12 @@ void NetworkManager::Run() {
                     if (packet->header.packetType == PT_PLAYER_ACTION) {
                         HandlePlayerActionPacket(event.peer, *packet);
                     }
+                }
+                if (event.packet->dataLength == sizeof(PlayerRequestPacket)) {
+					PlayerRequestPacket* packet = reinterpret_cast<PlayerRequestPacket*>(event.packet->data);
+					if (packet->header.packetType == PT_REQUEST_PLAYER_DATA) {
+						SendPlayerList(event.peer);
+					}
                 }
                 enet_packet_destroy(event.packet);
                 break;

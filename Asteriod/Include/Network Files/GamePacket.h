@@ -26,7 +26,10 @@ enum PacketType {
     PT_PLAYER_JOIN,          // Both directions
     PT_PLAYER_LEAVE,         // Server -> Client
     PT_ACK,                  // Acknowledgment
-    PT_PLAYER_ACTION         // Client -> Server: Player action
+    PT_PLAYER_ACTION,        // Client -> Server: Player action
+    PT_REQUEST_PLAYER_DATA,
+    PT_GAME_STATE_UPDATE,
+    PT_PLAYER_DATA           // Server -> Client: Player data
 };
 
 // Player input packet (Client -> Server)
@@ -62,6 +65,22 @@ struct GameStatePacket {
 
     unsigned short objectCount;
     ObjectState objects[50]; // Adjust size as needed
+};
+
+// Player data packet (Server -> Client)
+struct PlayerDataPacket {
+    PacketHeader header;
+
+    struct PlayerData {
+        unsigned char playerID;
+        char name[32];
+        int score;
+        bool isAlive;
+        bool isFiring; // Add isFiring field
+    };
+
+    unsigned char playerCount;
+    PlayerData players[4]; // Adjust size as needed
 };
 
 // Asteroid spawn packet (Server -> Client)
@@ -110,6 +129,10 @@ struct PlayerLeavePacket {
 struct AckPacket {
     PacketHeader header;
     unsigned int ackedSequenceNumber;
+};
+
+struct PlayerRequestPacket {
+    PacketHeader header;
 };
 
 #pragma pack(pop) // Restore default packing

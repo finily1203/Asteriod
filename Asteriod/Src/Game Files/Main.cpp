@@ -44,7 +44,7 @@ int WINAPI WinMain(HINSTANCE instanceH, HINSTANCE prevInstanceH, LPSTR command_l
     // Initialize network manager
     bool isServer = true; // Set to true if this instance is the server
     int port = 8888; // Set the UDP port number
-    std::string serverIP = "192.168.68.58"; // Set the server IP address
+    std::string serverIP = "10.134.222.156"; // Set the server IP address
 
     if (!isServer) {
         networkManager.setServer(serverIP);

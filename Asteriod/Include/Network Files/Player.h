@@ -49,8 +49,6 @@ public:
     void SetPeer(ENetPeer* peer); // Add this method
 
     // Ship control
-    void UpdateShipFromInput(unsigned char inputFlags, float frameTime);
-    void RespawnShip();
 
 private:
     unsigned char m_id;          // Unique player ID (1-4)
