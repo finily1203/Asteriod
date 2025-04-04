@@ -1,16 +1,4 @@
-/******************************************************************************/
-/*!
-\file		GameStateMgr.h
-\author 	Christopher Lam
-\par    	email: c.lam\@digipen.edu ... ...
-\date   	February 07, 2024
-\brief		This is the source file for the game state manager
 
-Copyright (C) 20xx DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
- */
-/******************************************************************************/
 
 #ifndef CSD1130_GAME_STATE_MGR_H_
 #define CSD1130_GAME_STATE_MGR_H_

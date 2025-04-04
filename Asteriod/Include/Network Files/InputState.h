@@ -1,16 +1,4 @@
-/******************************************************************************/
-/*!
-\file       InputState.h
-\author     [Your Name]
-\par        [Your Email]
-\date       [Current Date]
-\brief      Player input state definition for network transmission
 
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
-*/
-/******************************************************************************/
 
 #ifndef INPUT_STATE_H
 #define INPUT_STATE_H

@@ -1,17 +1,4 @@
-/******************************************************************************/
-/*!
-\file		GameState_Asteroids.cpp
-\author 	
-\par    	
-\date   	
-\brief		Source file for asteroid game state. Main game mechanics and interactions
-			are coded here.
 
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
- */
-/******************************************************************************/
 
 #define WIN32_LEAN_AND_MEAN
 #include <WinSock2.h>

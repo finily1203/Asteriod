@@ -1,16 +1,4 @@
-/******************************************************************************/
-/*!
-\file		Collision.h
-\author 	Christopher Lam
-\par    	email: c.lam\@digipen.edu ... ...
-\date   	February 07, 2024
-\brief		This is the header file for Collision.cpp.
 
-Copyright (C) 2024 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
- */
-/******************************************************************************/
 
 #ifndef CSD1130_COLLISION_H_
 #define CSD1130_COLLISION_H_
